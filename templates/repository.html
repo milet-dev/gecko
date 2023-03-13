@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>{{ repository.name }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #0f0f0f;
+            color: #f1f1f1;
+            font-size: 1rem;
+            line-height: 1.4;
+            letter-spacing: 0.03em;
+            font-weight: 400;
+        }
+
+        .branch {
+            color: #71dbdb;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div style="position: relative; margin: 30px;">
+        <h2>{{ repository.name }}</h2>
+        <ul>
+            {% for branch in repository.branches %}
+            <li><span class="branch">{{ branch.name }}</span> ({{ branch.ty }})</li>
+            <ul>
+                {% for entry in branch.entries %}
+                <li>{{ entry.name }}</li>
+                {% endfor %}
+            </ul>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+
+</html>
