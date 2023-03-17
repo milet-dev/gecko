@@ -18,3 +18,4 @@ askama = { version = "0.12.0", default-features = false, features = ["with-actix
 askama_actix = "0.14.0"
 mongodb = "2.4.0"
 bson = "2.6.0"
+humansize = "2.1.3"

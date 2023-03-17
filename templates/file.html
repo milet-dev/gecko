@@ -1,0 +1,14 @@
+{% include "shared/header.html" %}
+
+<div style="position: relative; margin: 30px;">
+    <div>
+        <a href="/repository/{{ name }}">{{ name }}</a>/tree/{{ branch }}/{{ tail|e }}
+
+    </div>
+    <p>{{content.lines().count() }} lines - {{ size }}</p>
+    <div>
+        <pre>{{ content|safe }}</pre>
+    </div>
+</div>
+
+{% include "shared/footer.html" %}

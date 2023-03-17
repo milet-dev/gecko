@@ -1,17 +1,14 @@
 {% include "shared/header.html" %}
 
 <div style="position: relative; margin: 30px;">
-    <a href="/repository/{{ name }}/commits">commits</a>
-
     <div style="max-width: 800px;">
-        <p>{{ commit.message }} (<span style="color: #70c5bf;">{{ commit.id[0..8] }}</span>)</p>
+        <p>{{ commit.message }}</p>
         <p>{{ commit.author.name }} - {{ commit.author.email }}</p>
     </div>
-
     <ul>
         {% for entry in entries %}
         <li>
-            <a href="/repository/{{ name }}/tree/{{ branch }}/{{ entry.name }}">
+            <a href="/repository/{{ name }}/tree/{{ branch }}/{{ tail }}/{{ entry.name }}">
                 {{ entry.name }}{% if entry.kind.as_str() == "Dir" %}/{% endif %}
             </a>
         </li>

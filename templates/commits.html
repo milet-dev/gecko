@@ -1,0 +1,18 @@
+{% include "shared/header.html" %}
+
+<div style="position: relative; margin: 30px;">
+    <h2>{{ name }}</h2>
+
+    <div style="max-width: 800px;">
+        <ul>
+            {% for commit in commits[0..20] %}
+            <li>
+                <p>{{ commit.message }} (<span style="color: #70c5bf;">{{ commit.id[0..8] }}</span>)</p>
+                <p>{{ commit.author.name }} - {{ commit.author.email }}</p>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+{% include "shared/footer.html" %}

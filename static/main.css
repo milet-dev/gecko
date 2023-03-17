@@ -26,13 +26,18 @@ label {
     padding-right: 10px;
 }
 
+select {
+    font-size: 0.9rem;
+    padding: 2px 5px;
+}
+
 .branch {
-    color: #71dbdb;
+    color: #70c5bf;
     font-weight: 600;
 }
 
 a {
-    color: #71dbdb;
+    color: #70c5bf;
     text-decoration: none;
 }
 
@@ -44,4 +49,9 @@ a:hover {
     display: flex;
     list-style-type: none;
     column-gap: 2ch;
+}
+
+select {
+    font-size: 0.9rem;
+    padding: 2px 5px;
 }

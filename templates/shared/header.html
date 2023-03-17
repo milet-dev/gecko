@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title></title>
+    <link rel="stylesheet" href="/static/main.css">
+</head>
+
+<body>
+    <div style="right: 50px; position: absolute; z-index: 1;">
+        <ul class="nav">
+            {% match user %}
+            {% when Some with (inner) %}
+            <li><a href="/@{{ inner.username }}">{{ inner.username }}</a></li>
+            <li><a href="/logout">logout</a></li>
+            {% when None %}
+            <li><a href="/signup">sign up</a></li>
+            <li><a href="/login">sign in</a></li>
+            {% endmatch %}
+        </ul>
+    </div>

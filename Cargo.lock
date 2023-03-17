@@ -892,6 +892,7 @@ dependencies = [
  "askama_actix",
  "bson",
  "git2",
+ "humansize",
  "mongodb",
  "serde",
  "serde_json",
