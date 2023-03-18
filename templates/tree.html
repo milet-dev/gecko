@@ -9,11 +9,21 @@
         {% for entry in entries %}
         <li>
             <a href="/repository/{{ name }}/tree/{{ branch }}/{{ tail }}/{{ entry.name }}">
-                {{ entry.name }}{% if entry.kind.as_str() == "Dir" %}/{% endif %}
+                {{ entry.name }}{% if entry.kind.as_str() == "Tree" %}/{% endif %}
             </a>
         </li>
         {% endfor %}
     </ul>
+
+    {% match readme %}
+    {% when Some with ((file_name, content)) %}
+    <h1>{{ file_name }}</h1>
+    <div style="border-bottom: 1px solid #e7e7e8; width: 100%;"></div>
+    <div>
+        {{ content|safe }}
+    </div>
+    {% when None %}
+    {% endmatch %}
 </div>
 
 {% include "shared/footer.html" %}

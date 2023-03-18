@@ -5,7 +5,7 @@
 
     <div style="max-width: 800px;">
         <ul>
-            {% for commit in commits[0..20] %}
+            {% for commit in commits %}
             <li>
                 <p>{{ commit.message }} (<span style="color: #70c5bf;">{{ commit.id[0..8] }}</span>)</p>
                 <p>{{ commit.author.name }} - {{ commit.author.email }}</p>
