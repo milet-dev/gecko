@@ -594,7 +594,7 @@ pub async fn _commits(
         }
     };
 
-    push_log(&repo, &commit, &mut log);
+    push_log(&commit, &mut log);
 
     Ok(CommitsTemplate {
         name: &name,
@@ -605,7 +605,7 @@ pub async fn _commits(
     .to_response())
 }
 
-fn push_log(repository: &git2::Repository, commit: &git2::Commit, log: &mut Vec<Commit>) {
+fn push_log(commit: &git2::Commit, log: &mut Vec<Commit>) {
     log.push(Commit {
         id: commit.id().to_string(),
         message: commit.summary().unwrap().to_string(),
@@ -617,5 +617,5 @@ fn push_log(repository: &git2::Repository, commit: &git2::Commit, log: &mut Vec<
     let Ok(parent) = commit.parent(0) else {
         return;
     };
-    push_log(repository, &parent, log);
+    push_log(&parent, log);
 }
