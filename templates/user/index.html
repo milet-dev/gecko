@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="/static/main.css">
+</head>
+
+<body>
+    <h2>
+        <a href="/@{{ user.username }}">@{{ user.username }}</a>
+    </h2>
+
+    <h4>Repositories:</h4>
+    <ul>
+        {% for repo in user.repositories %}
+        <li>
+            <a href="/@{{ user.username }}/{{ repo.name }}">{{ repo.name }}</a> - {{ repo.description }}
+        </li>
+        {% endfor %}
+    </ul>
+</body>
+
+</html>

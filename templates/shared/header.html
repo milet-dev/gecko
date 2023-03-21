@@ -11,7 +11,7 @@
         <ul class="nav">
             {% match user %}
             {% when Some with (inner) %}
-            <li><a href="/@{{ inner.username }}">{{ inner.username }}</a></li>
+            <li><a href="/@{{ inner.username }}">@{{ inner.username }}</a></li>
             <li><a href="/logout">logout</a></li>
             {% when None %}
             <li><a href="/signup">sign up</a></li>

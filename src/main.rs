@@ -11,7 +11,12 @@ use actix_web::{
     middleware::NormalizePath,
     web, App, HttpServer, Responder, Result,
 };
-use mongodb::Client;
+use askama::Template;
+use askama_actix::TemplateToResponse;
+use futures::TryStreamExt;
+use mongodb::{options::FindOptions, Client};
+
+use crate::model::User;
 
 const DATABASE_NAME: &str = "gecko";
 
@@ -20,14 +25,41 @@ pub struct State {
     pub db: mongodb::Database,
 }
 
+#[derive(Template)]
+#[template(path = "index.html")]
+struct IndexTemplate<'a> {
+    users: &'a [model::User],
+}
+
 #[get("/")]
-async fn index(identity: Option<Identity>) -> Result<impl Responder> {
+async fn index(state: web::Data<State>, identity: Option<Identity>) -> Result<impl Responder> {
     let id = match identity.map(|id| id.id()) {
         None => "None".to_owned(),
         Some(Ok(id)) => id,
         Some(Err(err)) => return Err(error::ErrorInternalServerError(err)),
     };
-    Ok(id)
+
+    let users_collection = state.db.collection::<User>("users");
+
+    let filter = bson::doc! {};
+    let find_options = FindOptions::builder()
+        .projection(bson::doc! {
+            "username": 1,
+            "email": "",
+            "password": "",
+            "repositories.name": 1,
+            "repositories.description": 1
+        })
+        .build();
+
+    let mut users = Vec::new();
+    if let Ok(mut cursor) = users_collection.find(filter, find_options).await {
+        while let Some(user) = cursor.try_next().await.unwrap() {
+            users.push(user.clone());
+        }
+    }
+
+    Ok(IndexTemplate { users: &users }.to_response())
 }
 
 #[actix_web::main]
@@ -61,10 +93,13 @@ async fn main() -> std::io::Result<()> {
             .service(user::login_internal)
             .service(user::logout)
             .service(index)
-            .service(repository::index)
+            .service(user::index)
             .service(
-                web::scope("/repository/{name}")
+                web::scope("/@{username}")
+                    .service(repository::index)
+                    .service(repository::_tree)
                     .service(repository::tree)
+                    .service(repository::_commits)
                     .service(repository::commits),
             )
     })

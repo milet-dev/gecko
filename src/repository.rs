@@ -1,8 +1,13 @@
-use crate::{model::User, State};
+use crate::{
+    model::{self, User},
+    State,
+};
 use actix_identity::Identity;
-use actix_web::{get, web, Responder, Result};
+use actix_web::{get, web, HttpResponse, Responder, Result};
 use askama::Template;
 use askama_actix::TemplateToResponse;
+use git2::Oid;
+use mongodb::options::FindOneOptions;
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,13 +27,13 @@ impl Kind {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct Author {
     name: String,
     email: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct Commit {
     id: String,
     message: String,
@@ -44,6 +49,8 @@ struct Entry {
 #[derive(Template)]
 #[template(path = "repository.html")]
 struct RepositoryTemplate<'a> {
+    repository: &'a model::Repository,
+    username: &'a str,
     name: &'a str,
     branch: &'a str,
     user: &'a Option<User>,
@@ -52,15 +59,36 @@ struct RepositoryTemplate<'a> {
     readme: Option<(String, String)>,
 }
 
-#[get("/repository/{name}")]
+#[get("/{name}")]
 pub async fn index(
-    path: web::Path<String>,
+    path: web::Path<(String, String)>,
     state: web::Data<State>,
     identity: Option<Identity>,
 ) -> Result<impl Responder> {
+    let users_collection = state.db.collection::<User>("users");
+
+    let (username, name) = path.into_inner();
+
+    let filter = bson::doc! { "username": &username, "repositories.name": &name };
+    let find_options = FindOneOptions::builder()
+        .projection(bson::doc! {
+            "username": 1,
+            "email": "",
+            "password": "",
+            "repositories.name": 1,
+            "repositories.description": 1
+        })
+        .build();
+    let Ok(Some(result)) = users_collection.find_one(filter, find_options).await else {
+        todo!();
+    };
+    let repository = match result.repositories.iter().find(|repo| repo.name == name) {
+        Some(inner) => inner,
+        None => return Ok(HttpResponse::Ok().body("")),
+    };
+
     let user = match identity {
         Some(identity) => {
-            let users_collection = state.db.collection::<User>("users");
             let filter = bson::doc! { "username": identity.id().unwrap() };
             let Ok(Some(user)) = users_collection.find_one(filter, None).await else {
                 unreachable!();
@@ -70,7 +98,6 @@ pub async fn index(
         None => None,
     };
 
-    let name = path.into_inner();
     let repo = git2::Repository::open(name.clone()).unwrap();
     let head = repo.head().unwrap();
     let commit = head.peel_to_commit().unwrap();
@@ -121,6 +148,8 @@ pub async fn index(
     entries.sort_by_key(|e| e.kind == Kind::File);
 
     Ok(RepositoryTemplate {
+        repository,
+        username: &username,
         name: &name,
         branch: "main",
         user: &user,
@@ -134,36 +163,41 @@ pub async fn index(
 #[derive(Template)]
 #[template(path = "tree.html")]
 struct TreeTemplate<'a> {
+    repository: &'a model::Repository,
+    username: &'a str,
     user: &'a Option<User>,
     entries: &'a [Entry],
     commit: Commit,
     name: &'a str,
     branch: &'a str,
     tail: &'a str,
+    breadcrumb: &'a str,
     readme: Option<(String, String)>,
 }
 
 #[derive(Template)]
 #[template(path = "file.html")]
 struct FileTemplate<'a> {
+    repository: &'a model::Repository,
+    username: &'a str,
     name: &'a str,
     branch: &'a str,
-    tail: &'a str,
+    breadcrumb: &'a str,
     user: &'a Option<User>,
     blob_name: &'a str,
     content: &'a str,
     size: &'a str,
 }
 
-#[get("tree/{branch}/{tail}*")]
-pub async fn tree(
+#[get("/{name}/tree/{branch}")]
+pub async fn _tree(
     path: web::Path<(String, String, String)>,
     state: web::Data<State>,
     identity: Option<Identity>,
 ) -> Result<impl Responder> {
+    let users_collection = state.db.collection::<User>("users");
     let user = match identity {
         Some(identity) => {
-            let users_collection = state.db.collection::<User>("users");
             let filter = bson::doc! { "username": identity.id().unwrap() };
             let Ok(Some(user)) = users_collection.find_one(filter, None).await else {
                 unreachable!();
@@ -172,34 +206,190 @@ pub async fn tree(
         }
         None => None,
     };
-    let (name, branch, tail) = path.into_inner();
-
+    let (username, name, branch) = path.into_inner();
+    let filter = bson::doc! { "username": &username, "repositories.name": &name };
+    let find_options = FindOneOptions::builder()
+        .projection(bson::doc! {
+            "username": 1,
+            "email": "",
+            "password": "",
+            "repositories.name": 1,
+            "repositories.description": 1
+        })
+        .build();
+    let Ok(Some(result)) = users_collection.find_one(filter, find_options).await else {
+        todo!();
+    };
+    let repository = match result.repositories.iter().find(|repo| repo.name == name) {
+        Some(inner) => inner,
+        None => return Ok(HttpResponse::NotFound().body("")),
+    };
     let repo = git2::Repository::open(name.clone()).unwrap();
-    let head = repo.head().unwrap();
-    let commit = head.peel_to_commit().unwrap();
+    let commit = {
+        if let Ok(inner) = repo.find_branch(&branch, git2::BranchType::Local) {
+            inner.get().peel_to_commit().unwrap()
+        } else {
+            repo.find_commit(Oid::from_str(&branch).unwrap()).unwrap()
+        }
+    };
+    let commit_tree = commit.tree().unwrap();
+
+    let message = commit.summary().unwrap().to_string();
+    let author_name = commit.author().name().unwrap().to_string();
+    let author_email = commit.author().email().unwrap().to_string();
+    let commit_ = Commit {
+        id: commit.id().to_string(),
+        message,
+        author: Author {
+            name: author_name,
+            email: author_email,
+        },
+    };
+    let mut readme: Option<(String, String)> = None;
+    let mut entries = vec![];
+    for entry in commit_tree.iter() {
+        let entry_name = entry.name().unwrap();
+
+        if entry.kind() == Some(git2::ObjectType::Blob) {
+            let blob_path = Path::new(entry_name);
+
+            if let Some(stem) = blob_path.file_stem() {
+                let stem = stem.to_string_lossy();
+
+                if let Some(ext) = blob_path.extension() {
+                    if stem == "README" && (ext == "md" || ext == "markdown") {
+                        let blob = repo.find_blob(entry.id()).unwrap();
+                        let content = String::from_utf8_lossy(blob.content());
+                        let output =
+                            markdown::to_html_with_options(&content, &markdown::Options::gfm())
+                                .unwrap();
+                        readme = Some((stem.into_owned(), output));
+                    }
+                }
+            }
+        }
+
+        let mut entry_kind = match entry.kind().unwrap() {
+            git2::ObjectType::Tree => Kind::Tree,
+            _ => Kind::File,
+        };
+
+        if repo.find_submodule(entry_name).is_ok() {
+            entry_kind = Kind::Submodule;
+        }
+
+        entries.push(Entry {
+            name: entry_name.to_string(),
+            kind: entry_kind,
+        });
+    }
+
+    entries.sort_by_key(|e| e.kind == Kind::File);
+
+    Ok(TreeTemplate {
+        repository,
+        username: &username,
+        user: &user,
+        entries: &entries,
+        commit: commit_,
+        name: &name,
+        branch: &branch,
+        tail: "",
+        breadcrumb: "",
+        readme,
+    }
+    .to_response())
+}
+
+#[get("/{name}/tree/{branch}/{tail}*")]
+pub async fn tree(
+    path: web::Path<(String, String, String, String)>,
+    state: web::Data<State>,
+    identity: Option<Identity>,
+) -> Result<impl Responder> {
+    let users_collection = state.db.collection::<User>("users");
+    let user = match identity {
+        Some(identity) => {
+            let filter = bson::doc! { "username": identity.id().unwrap() };
+            let Ok(Some(user)) = users_collection.find_one(filter, None).await else {
+                unreachable!();
+            };
+            Some(user)
+        }
+        None => None,
+    };
+    let (username, name, branch, tail) = path.into_inner();
+    let filter = bson::doc! { "username": &username, "repositories.name": &name };
+    let find_options = FindOneOptions::builder()
+        .projection(bson::doc! {
+            "username": 1,
+            "email": "",
+            "password": "",
+            "repositories.name": 1,
+            "repositories.description": 1
+        })
+        .build();
+    let Ok(Some(result)) = users_collection.find_one(filter, find_options).await else {
+        todo!();
+    };
+    let repository = match result.repositories.iter().find(|repo| repo.name == name) {
+        Some(inner) => inner,
+        None => return Ok(HttpResponse::NotFound().body("")),
+    };
+    let repo = git2::Repository::open(name.clone()).unwrap();
+    let commit = {
+        if let Ok(inner) = repo.find_branch(&branch, git2::BranchType::Local) {
+            inner.get().peel_to_commit().unwrap()
+        } else {
+            repo.find_commit(Oid::from_str(&branch).unwrap()).unwrap()
+        }
+    };
     let tree_entry = commit.tree().unwrap().get_path(Path::new(&tail)).unwrap();
     let object = tree_entry.to_object(&repo).unwrap();
 
     if let Some(blob) = object.as_blob() {
         let blob_name = tail.split('/').last().unwrap();
+        let size = humansize::format_size(blob.size(), humansize::DECIMAL.decimal_places(0));
 
         let content = String::from_utf8_lossy(blob.content());
-        let size = humansize::format_size(blob.size(), humansize::DECIMAL.decimal_places(0));
 
         let content = if blob_name.ends_with(".md") || blob_name.ends_with(".markdown") {
             markdown::to_html_with_options(&content, &markdown::Options::gfm()).unwrap()
         } else {
             let mut buffer = String::new();
             buffer.push_str("<pre>");
-            buffer.push_str(&content);
+            for (i, line) in content.lines().enumerate() {
+                let url = format!("<a class=\"line\" id=\"L{i}\" href=\"/@{username}/{name}/tree/{branch}/{tail}#L{i}\">{i}</a>\t{line}\n");
+                buffer.push_str(&url);
+            }
             buffer.push_str("</pre>");
             buffer
         };
 
+        let mut breadcrumb = String::new();
+        let mut buffer = String::new();
+        let segments = tail.split('/');
+        breadcrumb.push_str(&format!("<a href=\"/@{username}\">@{username}</a>/"));
+        breadcrumb.push_str(&format!(
+            "<a href=\"/@{username}/{name}/tree/{branch}\">{name}</a>/"
+        ));
+        for segment in segments {
+            buffer.push_str(segment);
+            buffer.push('/');
+            let url = if segment == blob_name {
+                segment.to_owned()
+            } else {
+                format!("<a href=\"/@{username}/{name}/tree/{branch}/{buffer}\">{segment}</a>/")
+            };
+            breadcrumb.push_str(&url);
+        }
+
         return Ok(FileTemplate {
+            repository,
+            username: &username,
             name: &name,
             branch: &branch,
-            tail: &tail,
+            breadcrumb: &breadcrumb,
             user: &user,
             blob_name,
             content: &content,
@@ -258,13 +448,35 @@ pub async fn tree(
 
     entries.sort_by_key(|e| e.kind == Kind::File);
 
+    let mut breadcrumb = String::new();
+    let mut buffer = String::new();
+    let segments = tail.split('/');
+    let last = segments.clone().last().unwrap().to_string();
+    breadcrumb.push_str(&format!("<a href=\"/@{username}\">@{username}</a>/"));
+    breadcrumb.push_str(&format!(
+        "<a href=\"/@{username}/{name}/tree/{branch}\">{name}</a>/"
+    ));
+    for segment in segments {
+        buffer.push_str(segment);
+        buffer.push('/');
+        let url = if segment == last {
+            segment.to_owned()
+        } else {
+            format!("<a href=\"/@{username}/{name}/tree/{branch}/{buffer}\">{segment}</a>/")
+        };
+        breadcrumb.push_str(&url);
+    }
+
     Ok(TreeTemplate {
+        repository,
+        username: &username,
         user: &user,
         entries: &entries,
         commit: commit_,
         name: &name,
         branch: &branch,
         tail: &tail,
+        breadcrumb: breadcrumb.trim_end_matches('/'),
         readme,
     }
     .to_response())
@@ -274,13 +486,14 @@ pub async fn tree(
 #[template(path = "commits.html")]
 struct CommitsTemplate<'a> {
     user: &'a Option<User>,
+    username: &'a str,
     name: &'a str,
     commits: &'a [Commit],
 }
 
-#[get("/commits")]
+#[get("/{name}/commits")]
 pub async fn commits(
-    path: web::Path<String>,
+    path: web::Path<(String, String)>,
     state: web::Data<State>,
     identity: Option<Identity>,
 ) -> Result<impl Responder> {
@@ -295,9 +508,11 @@ pub async fn commits(
         }
         None => None,
     };
-    let name = path.into_inner();
+
+    let (username, name) = path.into_inner();
 
     let repo = git2::Repository::open(name.clone()).unwrap();
+
     let mut revwalk = repo.revwalk().unwrap();
     revwalk.push_head().unwrap();
     let mut commits = Vec::new();
@@ -317,8 +532,67 @@ pub async fn commits(
 
     Ok(CommitsTemplate {
         name: &name,
+        username: &username,
         user: &user,
         commits: &commits,
     }
     .to_response())
+}
+
+#[get("/{name}/commits/{branch}")]
+pub async fn _commits(
+    path: web::Path<(String, String, String)>,
+    state: web::Data<State>,
+    identity: Option<Identity>,
+) -> Result<impl Responder> {
+    let user = match identity {
+        Some(identity) => {
+            let users_collection = state.db.collection::<User>("users");
+            let filter = bson::doc! { "username": identity.id().unwrap() };
+            let Ok(Some(user)) = users_collection.find_one(filter, None).await else {
+                unreachable!();
+            };
+            Some(user)
+        }
+        None => None,
+    };
+
+    let (username, name, branch) = path.into_inner();
+
+    let repo = git2::Repository::open(name.clone()).unwrap();
+
+    let mut log = vec![];
+
+    let commit = {
+        if let Ok(inner) = repo.find_branch(&branch, git2::BranchType::Local) {
+            inner.get().peel_to_commit().unwrap()
+        } else {
+            repo.find_commit(Oid::from_str(&branch).unwrap()).unwrap()
+        }
+    };
+
+    push_log(&repo, &commit, &mut log);
+
+    Ok(CommitsTemplate {
+        name: &name,
+        username: &username,
+        user: &user,
+        commits: &log,
+    }
+    .to_response())
+}
+
+fn push_log(repository: &git2::Repository, commit: &git2::Commit, log: &mut Vec<Commit>) {
+    log.push(Commit {
+        id: commit.id().to_string(),
+        message: commit.summary().unwrap().to_string(),
+        author: Author {
+            name: commit.author().name().unwrap().to_owned(),
+            email: commit.author().email().unwrap().to_owned(),
+        },
+    });
+    let Ok(parent) = commit.parent(0) else {
+        return;
+    };
+    push_log(repository, &parent, log);
 }

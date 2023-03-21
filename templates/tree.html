@@ -1,6 +1,16 @@
 {% include "shared/header.html" %}
 
 <div style="position: relative; margin: 30px;">
+    <div>{{ breadcrumb|safe }}</div>
+
+    <h2>
+        <a href="/@{{ username }}">@{{ username }}</a>
+    </h2>
+    <h4><a href="/@{{ username }}/{{ repository.name }}/tree/{{ branch }}">{{ repository.name }}</a></h4>
+    <p>{{ repository.description }}</p>
+
+    <a href="/@{{ username }}/{{ name }}/commits/{{ branch }}">commits</a>
+
     <div style="max-width: 800px;">
         <p>{{ commit.message }}</p>
         <p>{{ commit.author.name }} - {{ commit.author.email }}</p>
@@ -8,8 +18,9 @@
     <ul>
         {% for entry in entries %}
         <li>
-            <a href="/repository/{{ name }}/tree/{{ branch }}/{{ tail }}/{{ entry.name }}">
-                {{ entry.name }}{% if entry.kind.as_str() == "Tree" %}/{% endif %}
+            <a href="/@{{ username }}/{{ name }}/tree/{{ branch }}/{{ tail }}/{{ entry.name }}">
+                {{ entry.name }}{% if entry.kind.as_str() == "Tree" %}/{% else if entry.kind.as_str() == "Submodule"
+                %}*{% endif %}
             </a>
         </li>
         {% endfor %}

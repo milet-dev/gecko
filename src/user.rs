@@ -1,10 +1,14 @@
-use crate::{model::User, State};
+use crate::{
+    model::{self, User},
+    State,
+};
 use actix_identity::Identity;
 use actix_web::{
     get, http::StatusCode, post, web, HttpMessage, HttpRequest, HttpResponse, Responder,
 };
 use askama::Template;
 use askama_actix::TemplateToResponse;
+use mongodb::options::FindOneOptions;
 use serde::{Deserialize, Serialize};
 
 #[derive(Template)]
@@ -39,6 +43,7 @@ pub async fn signup_internal(
         email: params.email.clone(),
         username: params.username.clone(),
         password: params.password.clone(),
+        repositories: Vec::new(),
     };
     if collection.insert_one(&user, None).await.is_err() {
         todo!();
@@ -94,4 +99,37 @@ pub async fn login_internal(
 
     Identity::login(&req.extensions(), user.username).unwrap();
     web::Redirect::to("/").using_status_code(StatusCode::FOUND)
+}
+
+#[derive(Template)]
+#[template(path = "user/index.html")]
+struct IndexTemplate<'a> {
+    user: &'a model::User,
+}
+
+#[get("/@{username}")]
+async fn index(
+    path: web::Path<String>,
+    state: web::Data<State>,
+    identity: Option<Identity>,
+) -> actix_web::Result<impl Responder> {
+    let username = path.into_inner();
+
+    let collection = state.db.collection::<User>("users");
+
+    let filter = bson::doc! { "username": &username };
+    let find_options = FindOneOptions::builder()
+        .projection(bson::doc! {
+            "username": 1,
+            "email": "",
+            "password": "",
+            "repositories.name": 1,
+            "repositories.description": 1
+        })
+        .build();
+    let Ok(Some(user)) = collection.find_one(filter, find_options).await else {
+        return Ok(HttpResponse::NotFound().body(""));
+    };
+
+    Ok(IndexTemplate { user: &user }.to_response())
 }

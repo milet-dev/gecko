@@ -1,13 +1,17 @@
 {% include "shared/header.html" %}
 
 <div style="position: relative; margin: 30px;">
-    <h2>{{ name }}</h2>
+    <div style="font-size: 1.5rem; font-weight: 700;">
+        <a href="/@{{ username }}/{{ name }}">@{{ username }}</a>/<a
+            href="/@{{ username }}/{{ name }}/tree/{{ commits[0].id }}">{{ name }}</a>
+    </div>
 
     <div style="max-width: 800px;">
         <ul>
             {% for commit in commits %}
             <li>
-                <p>{{ commit.message }} (<span style="color: #70c5bf;">{{ commit.id[0..8] }}</span>)</p>
+                <p>{{ commit.message }} (<a style="color: #70c5bf;"
+                        href="/@{{ username }}/{{ name }}/tree/{{ commit.id }}">{{ commit.id[0..8] }}</a>)</p>
                 <p>{{ commit.author.name }} - {{ commit.author.email }}</p>
             </li>
             {% endfor %}
