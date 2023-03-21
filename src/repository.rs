@@ -301,9 +301,15 @@ pub async fn _tree(
     .to_response())
 }
 
+#[derive(serde::Deserialize)]
+pub struct Query {
+    raw: Option<bool>,
+}
+
 #[get("/{name}/tree/{branch}/{tail}*")]
 pub async fn tree(
     path: web::Path<(String, String, String, String)>,
+    query: web::Query<Query>,
     state: web::Data<State>,
     identity: Option<Identity>,
 ) -> Result<impl Responder> {
@@ -352,6 +358,23 @@ pub async fn tree(
         let size = humansize::format_size(blob.size(), humansize::DECIMAL.decimal_places(0));
 
         let content = String::from_utf8_lossy(blob.content());
+
+        if blob.is_binary() {
+            if let Some(raw) = query.raw {
+                if raw {
+                    return Ok(HttpResponse::Ok()
+                        .content_type("application/octet-stream")
+                        .insert_header((
+                            "Content-Disposition",
+                            format!("attachment; filename=\"{blob_name}\""),
+                        ))
+                        .body(content.into_owned()));
+                }
+            }
+            return Ok(HttpResponse::Ok()
+                .content_type("text/html")
+                .body(format!("{blob_name} {size}\n<a href=\"/@{username}/{name}/tree/{branch}/{tail}/?raw=true\">view raw</a>")));
+        }
 
         let content = if blob_name.ends_with(".md") || blob_name.ends_with(".markdown") {
             markdown::to_html_with_options(&content, &markdown::Options::gfm()).unwrap()
