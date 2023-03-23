@@ -149,10 +149,13 @@ async fn main() -> std::io::Result<()> {
             .service(
                 web::scope("/@{username}")
                     .service(repository::index)
-                    .service(repository::_tree)
-                    .service(repository::tree)
-                    .service(repository::_commits)
-                    .service(repository::commits),
+                    .service(
+                        web::scope("/{name}")
+                            .service(repository::_tree)
+                            .service(repository::tree)
+                            .service(repository::_commits)
+                            .service(repository::commits),
+                    ),
             )
     })
     .bind(("127.0.0.1", 8080))?

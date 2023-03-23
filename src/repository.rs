@@ -177,7 +177,7 @@ struct FileTemplate<'a> {
     size: &'a str,
 }
 
-#[get("/{name}/tree/{branch}")]
+#[get("/tree/{branch}")]
 pub async fn _tree(
     path: web::Path<(String, String, String)>,
     state: web::Data<State>,
@@ -282,7 +282,7 @@ pub struct Query {
     raw: Option<bool>,
 }
 
-#[get("/{name}/tree/{branch}/{tail}*")]
+#[get("/tree/{branch}/{tail}*")]
 pub async fn tree(
     path: web::Path<(String, String, String, String)>,
     query: web::Query<Query>,
@@ -480,7 +480,7 @@ struct CommitsTemplate<'a> {
     commits: &'a [Commit],
 }
 
-#[get("/{name}/commits")]
+#[get("/commits")]
 pub async fn commits(
     path: web::Path<(String, String)>,
     state: web::Data<State>,
@@ -527,23 +527,24 @@ pub async fn commits(
     .to_response())
 }
 
-#[get("/{name}/commits/{branch}")]
+#[get("/commits/{branch}")]
 pub async fn _commits(
     path: web::Path<(String, String, String)>,
     state: web::Data<State>,
     identity: Option<Identity>,
 ) -> Result<impl Responder> {
+    let (username, name, branch) = path.into_inner();
+
     let _identity = match identity {
         Some(identity) => {
             let Ok(id) = identity.id() else {
-                todo!()
+                return Ok(HttpResponse::NotFound().finish());
             };
             state.database.find_user(&id).await
         }
-        None => return Ok(HttpResponse::Ok().finish()),
+        None => None,
     };
 
-    let (username, name, branch) = path.into_inner();
     let user = state.database.find_user(&username).await;
 
     let repo = git2::Repository::open(name.clone()).unwrap();
