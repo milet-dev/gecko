@@ -1,5 +1,5 @@
 use crate::{
-    model::{self, User},
+    model::{Repository, User},
     State,
 };
 use actix_identity::Identity;
@@ -8,7 +8,6 @@ use actix_web::{
 };
 use askama::Template;
 use askama_actix::TemplateToResponse;
-use mongodb::options::FindOneOptions;
 use serde::{Deserialize, Serialize};
 
 #[derive(Template)]
@@ -40,10 +39,10 @@ pub async fn signup_internal(
     }
     let collection = state.db.collection::<User>("users");
     let user = User {
+        _id: bson::oid::ObjectId::default(),
         email: params.email.clone(),
         username: params.username.clone(),
         password: params.password.clone(),
-        repositories: Vec::new(),
     };
     if collection.insert_one(&user, None).await.is_err() {
         todo!();
@@ -70,7 +69,7 @@ pub async fn logout(identity: Option<Identity>) -> impl Responder {
     match identity {
         Some(identity) => {
             identity.logout();
-            HttpResponse::Ok().body("")
+            HttpResponse::Ok().finish()
         }
         None => HttpResponse::Unauthorized().body("Unauthorized"),
     }
@@ -91,9 +90,7 @@ pub async fn login_internal(
     let username = params.username.clone();
     let password = params.password.clone();
 
-    let users_collection = state.db.collection::<User>("users");
-    let filter = bson::doc! { "username": username, "password": password };
-    let Ok(Some(user)) = users_collection.find_one(filter, None).await else {
+    let Some(user) = state.database.login(&username, &password).await else {
         return web::Redirect::to("/").using_status_code(StatusCode::NOT_FOUND)
     };
 
@@ -104,7 +101,9 @@ pub async fn login_internal(
 #[derive(Template)]
 #[template(path = "user/index.html")]
 struct IndexTemplate<'a> {
-    user: &'a model::User,
+    user: &'a User,
+    identity: &'a Option<User>,
+    repositories: &'a [Repository],
 }
 
 #[get("/@{username}")]
@@ -115,21 +114,75 @@ async fn index(
 ) -> actix_web::Result<impl Responder> {
     let username = path.into_inner();
 
-    let collection = state.db.collection::<User>("users");
-
-    let filter = bson::doc! { "username": &username };
-    let find_options = FindOneOptions::builder()
-        .projection(bson::doc! {
-            "username": 1,
-            "email": "",
-            "password": "",
-            "repositories.name": 1,
-            "repositories.description": 1
-        })
-        .build();
-    let Ok(Some(user)) = collection.find_one(filter, find_options).await else {
-        return Ok(HttpResponse::NotFound().body(""));
+    let identity = match identity {
+        Some(identity) => match identity.id() {
+            Ok(id) => state.database.find_user(&id).await,
+            Err(_) => todo!(),
+        },
+        None => None,
     };
 
-    Ok(IndexTemplate { user: &user }.to_response())
+    let user = state.database.find_user(&username).await.unwrap();
+
+    let Some(repositories) = state.database.find_user_repositories(&username).await else {
+        return Ok(HttpResponse::NotFound().finish());
+    };
+
+    Ok(IndexTemplate {
+        user: &user,
+        identity: &identity,
+        repositories: &repositories,
+    }
+    .to_response())
+}
+
+#[derive(Template)]
+#[template(path = "new.html")]
+struct NewRepositoryTemplate<'a> {
+    title: &'a str,
+}
+
+#[get("/new")]
+async fn new(state: web::Data<State>, identity: Option<Identity>) -> impl Responder {
+    let Some(identity) = identity else {
+        return HttpResponse::Unauthorized().body("Unauthorized");
+    };
+
+    let username = identity.id().unwrap();
+
+    if state.database.find_user(&username).await.is_none() {
+        return HttpResponse::Unauthorized().body("Unauthorized");
+    }
+
+    NewRepositoryTemplate { title: "" }.to_response()
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct NewRepositoryForm {
+    name: String,
+    description: String,
+    visibility: String,
+}
+
+#[post("/new")]
+async fn new_internal(
+    state: web::Data<State>,
+    identity: Option<Identity>,
+    form: web::Form<NewRepositoryForm>,
+) -> impl Responder {
+    let Some(identity) = identity else {
+        todo!()
+    };
+
+    let username = identity.id().unwrap();
+
+    let user = state.database.find_user(&username).await;
+
+    let repository_name = form.name.clone();
+    state
+        .database
+        .new_repository(&user, &repository_name, None, &form.visibility)
+        .await;
+
+    web::Redirect::to(format!("/@{username}/{}", form.name)).using_status_code(StatusCode::FOUND)
 }

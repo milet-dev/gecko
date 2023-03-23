@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title></title>
+    <link rel="stylesheet" href="/static/main.css">
+</head>
+
+<body>
+    <div style="position: relative; margin: 30px;">
+        <form action="/new" method="post">
+            <div>
+                <label>name</label>
+                <input type="text" name="name" spellcheck="false" autocomplete="off" required>
+            </div>
+            <div>
+                <label>description</label>
+                <input type="text" name="description" spellcheck="false" autocomplete="off">
+            </div>
+            <div>
+                <div>
+                    <label>
+                        <input type="radio" name="visibility" value="public" checked>
+                        Public
+                    </label>
+                </div>
+                <div>
+                    <label>
+                        <input type="radio" name="visibility" value="private">
+                        Private
+                    </label>
+                </div>
+            </div>
+            <div>
+                <input type="submit" value="new">
+            </div>
+        </form>
+    </div>
+</body>
+
+</html>

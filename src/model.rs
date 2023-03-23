@@ -1,15 +1,18 @@
+use bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Repository {
+    pub user_id: ObjectId,
     pub name: String,
     pub description: String,
+    pub visibility: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
+    pub _id: ObjectId,
     pub email: String,
     pub username: String,
     pub password: String,
-    pub repositories: Vec<Repository>,
 }

@@ -1,23 +1,20 @@
-<!DOCTYPE html>
-<html>
+{% include "shared/header.html" %}
 
-<head>
-    <link rel="stylesheet" href="/static/main.css">
-</head>
-
-<body>
+<div style="position: relative; margin: 30px;">
     <h2>
         <a href="/@{{ user.username }}">@{{ user.username }}</a>
     </h2>
 
     <h4>Repositories:</h4>
+    {% if !repositories.is_empty() %}
     <ul>
-        {% for repo in user.repositories %}
+        {% for repo in repositories %}
         <li>
             <a href="/@{{ user.username }}/{{ repo.name }}">{{ repo.name }}</a> - {{ repo.description }}
         </li>
         {% endfor %}
     </ul>
-</body>
+    {% endif %}
+</div>
 
-</html>
+{% include "shared/footer.html" %}

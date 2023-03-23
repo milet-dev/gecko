@@ -9,8 +9,9 @@
 <body>
     <div style="right: 50px; position: absolute; z-index: 1;">
         <ul class="nav">
-            {% match user %}
+            {% match identity %}
             {% when Some with (inner) %}
+            <li><a href="/new">new</a></li>
             <li><a href="/@{{ inner.username }}">@{{ inner.username }}</a></li>
             <li><a href="/logout">logout</a></li>
             {% when None %}

@@ -1,65 +1,113 @@
+mod database;
 mod model;
 mod repository;
 mod user;
 
+use crate::model::{Repository, User};
 use actix_files::Files;
 use actix_identity::{Identity, IdentityMiddleware};
 use actix_session::{config::PersistentSession, storage::CookieSessionStore, SessionMiddleware};
 use actix_web::{
     cookie::{time::Duration, Key},
-    error, get,
+    get,
     middleware::NormalizePath,
     web, App, HttpServer, Responder, Result,
 };
 use askama::Template;
 use askama_actix::TemplateToResponse;
+use bson::oid::ObjectId;
+use database::Database;
 use futures::TryStreamExt;
-use mongodb::{options::FindOptions, Client};
-
-use crate::model::User;
+use mongodb::Client;
 
 const DATABASE_NAME: &str = "gecko";
 
 #[derive(Clone)]
 pub struct State {
     pub db: mongodb::Database,
+    pub database: Database,
+}
+
+#[derive(Clone, serde::Deserialize)]
+pub struct User_ {
+    username: String,
+    repositories: Vec<Repository>,
 }
 
 #[derive(Template)]
 #[template(path = "index.html")]
 struct IndexTemplate<'a> {
-    users: &'a [model::User],
+    identity: &'a Option<User>,
+    users: &'a [User_],
 }
 
 #[get("/")]
 async fn index(state: web::Data<State>, identity: Option<Identity>) -> Result<impl Responder> {
-    let id = match identity.map(|id| id.id()) {
-        None => "None".to_owned(),
-        Some(Ok(id)) => id,
-        Some(Err(err)) => return Err(error::ErrorInternalServerError(err)),
+    let identity = match identity {
+        Some(identity) => match identity.id() {
+            Ok(id) => state.database.find_user(&id).await,
+            Err(_) => todo!(),
+        },
+        None => None,
     };
 
-    let users_collection = state.db.collection::<User>("users");
+    let collection = state.db.collection::<User>("users");
 
-    let filter = bson::doc! {};
-    let find_options = FindOptions::builder()
-        .projection(bson::doc! {
-            "username": 1,
-            "email": "",
-            "password": "",
-            "repositories.name": 1,
-            "repositories.description": 1
-        })
-        .build();
+    let output = collection
+        .aggregate(
+            [bson::doc! {
+                "$lookup": {
+                    "from": "repositories",
+                    "localField": "_id",
+                    "foreignField": "user_id",
+                    "pipeline": [
+                        {
+                            "$project": {
+                                "user_id": "$user_id",
+                                "name": "$name",
+                                "description": "$description",
+                                "visibility": "$visibility"
+                            }
+                        },
+                    ],
+                    "as": "repositories"
+                }
+            }],
+            None,
+        )
+        .await;
 
-    let mut users = Vec::new();
-    if let Ok(mut cursor) = users_collection.find(filter, find_options).await {
-        while let Some(user) = cursor.try_next().await.unwrap() {
-            users.push(user.clone());
-        }
+    let mut cursor = output.unwrap();
+    let mut users: Vec<User_> = Vec::new();
+    while let Some(document) = cursor.try_next().await.unwrap() {
+        let Ok(repositories) = document.get_array("repositories") else {
+            continue;
+        };
+        users.push(User_ {
+            username: document.get_str("username").unwrap().to_owned(),
+            repositories: repositories
+                .iter()
+                .map(|inner| {
+                    let inner = inner.as_document().unwrap();
+                    let name = inner.get_str("name");
+                    let description = inner.get_str("description");
+                    let visibility = inner.get_str("visibility");
+                    Repository {
+                        user_id: ObjectId::default(),
+                        name: name.unwrap().to_string(),
+                        description: description.unwrap().to_string(),
+                        visibility: visibility.unwrap().to_string(),
+                    }
+                })
+                .collect(),
+        });
     }
 
-    Ok(IndexTemplate { users: &users }.to_response())
+    Ok(IndexTemplate {
+        identity: &identity,
+        users: &users,
+    }
+    .to_response())
 }
 
 #[actix_web::main]
@@ -70,8 +118,10 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap();
 
+    let database = Database::new(&client);
     let state = State {
         db: client.database(DATABASE_NAME),
+        database,
     };
 
     HttpServer::new(move || {
@@ -92,6 +142,8 @@ async fn main() -> std::io::Result<()> {
             .service(user::login)
             .service(user::login_internal)
             .service(user::logout)
+            .service(user::new)
+            .service(user::new_internal)
             .service(index)
             .service(user::index)
             .service(

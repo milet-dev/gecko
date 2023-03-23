@@ -7,7 +7,6 @@ use actix_web::{get, web, HttpResponse, Responder, Result};
 use askama::Template;
 use askama_actix::TemplateToResponse;
 use git2::Oid;
-use mongodb::options::FindOneOptions;
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,6 +53,7 @@ struct RepositoryTemplate<'a> {
     name: &'a str,
     branch: &'a str,
     user: &'a Option<User>,
+    identity: &'a Option<User>,
     entries: &'a [Entry],
     commit: Commit,
     readme: Option<(String, String)>,
@@ -65,40 +65,25 @@ pub async fn index(
     state: web::Data<State>,
     identity: Option<Identity>,
 ) -> Result<impl Responder> {
-    let users_collection = state.db.collection::<User>("users");
-
     let (username, name) = path.into_inner();
 
-    let filter = bson::doc! { "username": &username, "repositories.name": &name };
-    let find_options = FindOneOptions::builder()
-        .projection(bson::doc! {
-            "username": 1,
-            "email": "",
-            "password": "",
-            "repositories.name": 1,
-            "repositories.description": 1
-        })
-        .build();
-    let Ok(Some(result)) = users_collection.find_one(filter, find_options).await else {
-        todo!();
-    };
-    let repository = match result.repositories.iter().find(|repo| repo.name == name) {
-        Some(inner) => inner,
-        None => return Ok(HttpResponse::Ok().body("")),
-    };
-
-    let user = match identity {
-        Some(identity) => {
-            let filter = bson::doc! { "username": identity.id().unwrap() };
-            let Ok(Some(user)) = users_collection.find_one(filter, None).await else {
-                unreachable!();
-            };
-            Some(user)
-        }
+    let identity = match identity {
+        Some(identity) => match identity.id() {
+            Ok(id) => state.database.find_user(&id).await,
+            Err(_) => todo!(),
+        },
         None => None,
     };
 
-    let repo = git2::Repository::open(name.clone()).unwrap();
+    let user = state.database.find_user(&username).await;
+
+    let Some(repository) = state.database.find_repository(&user, &name).await else {
+        return Ok(HttpResponse::Ok().finish());
+    };
+
+    let Ok(repo) = git2::Repository::open(name.clone()) else {
+        return Ok(HttpResponse::NotFound().finish());
+    };
     let head = repo.head().unwrap();
     let commit = head.peel_to_commit().unwrap();
 
@@ -148,11 +133,12 @@ pub async fn index(
     entries.sort_by_key(|e| e.kind == Kind::File);
 
     Ok(RepositoryTemplate {
-        repository,
+        repository: &repository,
         username: &username,
         name: &name,
         branch: "main",
         user: &user,
+        identity: &identity,
         entries: &entries,
         commit: commit_,
         readme,
@@ -166,6 +152,7 @@ struct TreeTemplate<'a> {
     repository: &'a model::Repository,
     username: &'a str,
     user: &'a Option<User>,
+    identity: &'a Option<User>,
     entries: &'a [Entry],
     commit: Commit,
     name: &'a str,
@@ -184,6 +171,7 @@ struct FileTemplate<'a> {
     branch: &'a str,
     breadcrumb: &'a str,
     user: &'a Option<User>,
+    identity: &'a Option<User>,
     blob_name: &'a str,
     content: &'a str,
     size: &'a str,
@@ -195,35 +183,22 @@ pub async fn _tree(
     state: web::Data<State>,
     identity: Option<Identity>,
 ) -> Result<impl Responder> {
-    let users_collection = state.db.collection::<User>("users");
-    let user = match identity {
-        Some(identity) => {
-            let filter = bson::doc! { "username": identity.id().unwrap() };
-            let Ok(Some(user)) = users_collection.find_one(filter, None).await else {
-                unreachable!();
-            };
-            Some(user)
-        }
+    let (username, name, branch) = path.into_inner();
+
+    let identity = match identity {
+        Some(identity) => match identity.id() {
+            Ok(id) => state.database.find_user(&id).await,
+            Err(_) => todo!(),
+        },
         None => None,
     };
-    let (username, name, branch) = path.into_inner();
-    let filter = bson::doc! { "username": &username, "repositories.name": &name };
-    let find_options = FindOneOptions::builder()
-        .projection(bson::doc! {
-            "username": 1,
-            "email": "",
-            "password": "",
-            "repositories.name": 1,
-            "repositories.description": 1
-        })
-        .build();
-    let Ok(Some(result)) = users_collection.find_one(filter, find_options).await else {
-        todo!();
+
+    let user = state.database.find_user(&username).await;
+
+    let Some(repository) = state.database.find_repository(&user, &name).await else {
+        return Ok(HttpResponse::Ok().finish());
     };
-    let repository = match result.repositories.iter().find(|repo| repo.name == name) {
-        Some(inner) => inner,
-        None => return Ok(HttpResponse::NotFound().body("")),
-    };
+
     let repo = git2::Repository::open(name.clone()).unwrap();
     let commit = {
         if let Ok(inner) = repo.find_branch(&branch, git2::BranchType::Local) {
@@ -287,9 +262,10 @@ pub async fn _tree(
     entries.sort_by_key(|e| e.kind == Kind::File);
 
     Ok(TreeTemplate {
-        repository,
+        repository: &repository,
         username: &username,
         user: &user,
+        identity: &identity,
         entries: &entries,
         commit: commit_,
         name: &name,
@@ -313,35 +289,22 @@ pub async fn tree(
     state: web::Data<State>,
     identity: Option<Identity>,
 ) -> Result<impl Responder> {
-    let users_collection = state.db.collection::<User>("users");
-    let user = match identity {
-        Some(identity) => {
-            let filter = bson::doc! { "username": identity.id().unwrap() };
-            let Ok(Some(user)) = users_collection.find_one(filter, None).await else {
-                unreachable!();
-            };
-            Some(user)
-        }
+    let (username, name, branch, tail) = path.into_inner();
+
+    let identity = match identity {
+        Some(identity) => match identity.id() {
+            Ok(id) => state.database.find_user(&id).await,
+            Err(_) => todo!(),
+        },
         None => None,
     };
-    let (username, name, branch, tail) = path.into_inner();
-    let filter = bson::doc! { "username": &username, "repositories.name": &name };
-    let find_options = FindOneOptions::builder()
-        .projection(bson::doc! {
-            "username": 1,
-            "email": "",
-            "password": "",
-            "repositories.name": 1,
-            "repositories.description": 1
-        })
-        .build();
-    let Ok(Some(result)) = users_collection.find_one(filter, find_options).await else {
-        todo!();
+
+    let user = state.database.find_user(&username).await;
+
+    let Some(repository) = state.database.find_repository(&user, &name).await else {
+        return Ok(HttpResponse::Ok().finish());
     };
-    let repository = match result.repositories.iter().find(|repo| repo.name == name) {
-        Some(inner) => inner,
-        None => return Ok(HttpResponse::NotFound().body("")),
-    };
+
     let repo = git2::Repository::open(name.clone()).unwrap();
     let commit = {
         if let Ok(inner) = repo.find_branch(&branch, git2::BranchType::Local) {
@@ -408,12 +371,13 @@ pub async fn tree(
         }
 
         return Ok(FileTemplate {
-            repository,
+            repository: &repository,
             username: &username,
             name: &name,
             branch: &branch,
             breadcrumb: &breadcrumb,
             user: &user,
+            identity: &identity,
             blob_name,
             content: &content,
             size: &size,
@@ -491,9 +455,10 @@ pub async fn tree(
     }
 
     Ok(TreeTemplate {
-        repository,
+        repository: &repository,
         username: &username,
         user: &user,
+        identity: &identity,
         entries: &entries,
         commit: commit_,
         name: &name,
@@ -509,6 +474,7 @@ pub async fn tree(
 #[template(path = "commits.html")]
 struct CommitsTemplate<'a> {
     user: &'a Option<User>,
+    identity: &'a Option<User>,
     username: &'a str,
     name: &'a str,
     commits: &'a [Commit],
@@ -520,19 +486,17 @@ pub async fn commits(
     state: web::Data<State>,
     identity: Option<Identity>,
 ) -> Result<impl Responder> {
-    let user = match identity {
-        Some(identity) => {
-            let users_collection = state.db.collection::<User>("users");
-            let filter = bson::doc! { "username": identity.id().unwrap() };
-            let Ok(Some(user)) = users_collection.find_one(filter, None).await else {
-                unreachable!();
-            };
-            Some(user)
-        }
+    let (username, name) = path.into_inner();
+
+    let identity = match identity {
+        Some(identity) => match identity.id() {
+            Ok(id) => state.database.find_user(&id).await,
+            Err(_) => todo!(),
+        },
         None => None,
     };
 
-    let (username, name) = path.into_inner();
+    let user = state.database.find_user(&username).await;
 
     let repo = git2::Repository::open(name.clone()).unwrap();
 
@@ -557,6 +521,7 @@ pub async fn commits(
         name: &name,
         username: &username,
         user: &user,
+        identity: &identity,
         commits: &commits,
     }
     .to_response())
@@ -568,19 +533,18 @@ pub async fn _commits(
     state: web::Data<State>,
     identity: Option<Identity>,
 ) -> Result<impl Responder> {
-    let user = match identity {
+    let _identity = match identity {
         Some(identity) => {
-            let users_collection = state.db.collection::<User>("users");
-            let filter = bson::doc! { "username": identity.id().unwrap() };
-            let Ok(Some(user)) = users_collection.find_one(filter, None).await else {
-                unreachable!();
+            let Ok(id) = identity.id() else {
+                todo!()
             };
-            Some(user)
+            state.database.find_user(&id).await
         }
-        None => None,
+        None => return Ok(HttpResponse::Ok().finish()),
     };
 
     let (username, name, branch) = path.into_inner();
+    let user = state.database.find_user(&username).await;
 
     let repo = git2::Repository::open(name.clone()).unwrap();
 
@@ -600,6 +564,7 @@ pub async fn _commits(
         name: &name,
         username: &username,
         user: &user,
+        identity: &_identity,
         commits: &log,
     }
     .to_response())
