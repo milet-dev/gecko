@@ -86,4 +86,28 @@ impl Database {
             todo!();
         }
     }
+
+    pub async fn delete_repository(
+        &self,
+        user: &Option<User>,
+        name: &str,
+    ) -> anyhow::Result<(), Error> {
+        let Some(user) = user else {
+            return Err(Error::Unauthorized);
+        };
+        let collection = self.inner.collection::<Repository>("repositories");
+        let result = collection
+            .find_one_and_delete(bson::doc! { "user_id": user._id, "name": name}, None)
+            .await
+            .unwrap();
+        if result.is_none() {
+            return Err(Error::NotFound);
+        }
+        Ok(())
+    }
+}
+
+pub enum Error {
+    Unauthorized,
+    NotFound,
 }

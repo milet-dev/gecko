@@ -122,10 +122,20 @@ async fn index(
         None => None,
     };
 
-    let user = state.database.find_user(&username).await.unwrap();
+    let Some(user) = state.database.find_user(&username).await else {
+        return Ok(HttpResponse::NotFound().finish());
+    };
 
     let Some(repositories) = state.database.find_user_repositories(&username).await else {
         return Ok(HttpResponse::NotFound().finish());
+    };
+
+    let repositories: Vec<_> = match identity.as_ref() {
+        Some(identity) if identity._id == user._id => repositories.into_iter().collect(),
+        _ => repositories
+            .into_iter()
+            .filter(|inner| inner.visibility == "public")
+            .collect(),
     };
 
     Ok(IndexTemplate {

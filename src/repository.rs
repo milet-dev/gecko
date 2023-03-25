@@ -585,3 +585,29 @@ fn push_log(commit: &git2::Commit, log: &mut Vec<Commit>) {
     };
     push_log(&parent, log);
 }
+
+#[get("/delete/{name}")]
+pub async fn delete(
+    path: web::Path<String>,
+    state: web::Data<State>,
+    identity: Option<Identity>,
+) -> impl Responder {
+    let name = path.into_inner();
+
+    let identity = match identity {
+        Some(identity) => match identity.id() {
+            Ok(id) => state.database.find_user(&id).await,
+            Err(_) => todo!(),
+        },
+        None => None,
+    };
+
+    let result = state.database.delete_repository(&identity, &name).await;
+    match result {
+        Ok(_) => "Ok",
+        Err(e) => match e {
+            crate::database::Error::Unauthorized => "Unauthorized",
+            crate::database::Error::NotFound => "Not Found",
+        },
+    }
+}

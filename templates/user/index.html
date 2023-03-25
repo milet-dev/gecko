@@ -10,7 +10,8 @@
     <ul>
         {% for repo in repositories %}
         <li>
-            <a href="/@{{ user.username }}/{{ repo.name }}">{{ repo.name }}</a> - {{ repo.description }}
+            <a href="/@{{ user.username }}/{{ repo.name }}">{{ repo.name }}</a>({{ repo.visibility }}) - {{
+            repo.description }}
         </li>
         {% endfor %}
     </ul>

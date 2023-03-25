@@ -80,26 +80,41 @@ async fn index(state: web::Data<State>, identity: Option<Identity>) -> Result<im
     let mut cursor = output.unwrap();
     let mut users: Vec<User_> = Vec::new();
     while let Some(document) = cursor.try_next().await.unwrap() {
+        let username = document.get_str("username").unwrap().to_owned();
+
+        let user = state.database.find_user(&username).await.unwrap();
+
         let Ok(repositories) = document.get_array("repositories") else {
             continue;
         };
-        users.push(User_ {
-            username: document.get_str("username").unwrap().to_owned(),
-            repositories: repositories
-                .iter()
-                .map(|inner| {
-                    let inner = inner.as_document().unwrap();
-                    let name = inner.get_str("name");
-                    let description = inner.get_str("description");
-                    let visibility = inner.get_str("visibility");
-                    Repository {
-                        user_id: ObjectId::default(),
-                        name: name.unwrap().to_string(),
-                        description: description.unwrap().to_string(),
-                        visibility: visibility.unwrap().to_string(),
-                    }
-                })
+
+        let repositories: Vec<_> = repositories
+            .iter()
+            .map(|inner| {
+                let inner = inner.as_document().unwrap();
+                let name = inner.get_str("name");
+                let description = inner.get_str("description");
+                let visibility = inner.get_str("visibility");
+                Repository {
+                    user_id: ObjectId::default(),
+                    name: name.unwrap().to_string(),
+                    description: description.unwrap().to_string(),
+                    visibility: visibility.unwrap().to_string(),
+                }
+            })
+            .collect();
+
+        let repositories: Vec<_> = match identity.as_ref() {
+            Some(identity) if identity._id == user._id => repositories.into_iter().collect(),
+            _ => repositories
+                .into_iter()
+                .filter(|inner| inner.visibility == "public")
                 .collect(),
+        };
+
+        users.push(User_ {
+            username,
+            repositories,
         });
     }
 
@@ -146,6 +161,7 @@ async fn main() -> std::io::Result<()> {
             .service(user::new_internal)
             .service(index)
             .service(user::index)
+            .service(repository::delete)
             .service(
                 web::scope("/@{username}")
                     .service(repository::index)
