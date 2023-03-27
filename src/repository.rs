@@ -608,6 +608,7 @@ pub async fn delete(
         Err(e) => match e {
             crate::database::Error::Unauthorized => "Unauthorized",
             crate::database::Error::NotFound => "Not Found",
+            _ => unreachable!(),
         },
     }
 }

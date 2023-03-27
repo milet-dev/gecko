@@ -3,9 +3,7 @@ use crate::{
     State,
 };
 use actix_identity::Identity;
-use actix_web::{
-    get, http::StatusCode, post, web, HttpMessage, HttpRequest, HttpResponse, Responder,
-};
+use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use askama::Template;
 use askama_actix::TemplateToResponse;
 use serde::{Deserialize, Serialize};
@@ -35,7 +33,7 @@ pub async fn signup_internal(
     params: web::Form<SignupForm>,
 ) -> impl Responder {
     if identity.is_some() {
-        return web::Redirect::to("/");
+        return web::Redirect::to("/").see_other();
     }
     let collection = state.db.collection::<User>("users");
     let now = time::OffsetDateTime::now_utc();
@@ -50,7 +48,7 @@ pub async fn signup_internal(
     if collection.insert_one(&user, None).await.is_err() {
         todo!();
     }
-    web::Redirect::to("/login")
+    web::Redirect::to("/login").see_other()
 }
 
 #[derive(Template)]
@@ -62,7 +60,9 @@ struct LoginTemplate<'a> {
 #[get("/login")]
 pub async fn login(identity: Option<Identity>) -> impl Responder {
     if identity.is_some() {
-        return HttpResponse::Unauthorized().body("Unauthorized");
+        return HttpResponse::SeeOther()
+            .insert_header(("Location", "/"))
+            .finish();
     }
     LoginTemplate { title: "login" }.to_response()
 }
@@ -94,11 +94,11 @@ pub async fn login_internal(
     let password = params.password.clone();
 
     let Some(user) = state.database.login(&username, &password).await else {
-        return web::Redirect::to("/").using_status_code(StatusCode::NOT_FOUND)
+        return web::Redirect::to("/login").see_other();
     };
 
     Identity::login(&req.extensions(), user.username).unwrap();
-    web::Redirect::to("/").using_status_code(StatusCode::FOUND)
+    web::Redirect::to("/").see_other()
 }
 
 #[derive(Template)]
@@ -184,7 +184,7 @@ async fn new_internal(
     form: web::Form<NewRepositoryForm>,
 ) -> impl Responder {
     let Some(identity) = identity else {
-        todo!()
+        return web::Redirect::to("/").see_other();
     };
 
     let username = identity.id().unwrap();
@@ -192,10 +192,14 @@ async fn new_internal(
     let user = state.database.find_user(&username).await;
 
     let repository_name = form.name.clone();
-    state
+    let result = state
         .database
         .new_repository(&user, &repository_name, None, &form.visibility)
         .await;
+    if result.eq(&Err(crate::database::Error::Found)) {
+        eprintln!("Found");
+        return web::Redirect::to("/new").see_other();
+    }
 
-    web::Redirect::to(format!("/@{username}/{}", form.name)).using_status_code(StatusCode::FOUND)
+    web::Redirect::to(format!("/@{username}/{}", form.name)).see_other()
 }

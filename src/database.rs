@@ -71,11 +71,22 @@ impl Database {
         name: &str,
         description: Option<&str>,
         visibility: &str,
-    ) {
+    ) -> anyhow::Result<(), Error> {
         let Some(user) = user else {
             panic!();
         };
+
         let collection = self.inner.collection::<Repository>("repositories");
+
+        if let Ok(document) = collection
+            .find_one(bson::doc! { "user_id": user._id, "name": name }, None)
+            .await
+        {
+            if document.is_some() {
+                return Err(Error::Found);
+            }
+        }
+
         let now = time::OffsetDateTime::now_utc();
         let repository = Repository {
             user_id: user._id,
@@ -88,6 +99,8 @@ impl Database {
         if collection.insert_one(&repository, None).await.is_err() {
             todo!();
         }
+
+        Ok(())
     }
 
     pub async fn delete_repository(
@@ -110,7 +123,9 @@ impl Database {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     Unauthorized,
     NotFound,
+    Found,
 }
