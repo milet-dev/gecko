@@ -21,3 +21,4 @@ futures = "0.3.27"
 bson = "2.6.0"
 humansize = "2.1.3"
 markdown = "1.0.0-alpha.7"
+time = { version = "0.3.20", features = ["macros"] }

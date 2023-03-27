@@ -38,11 +38,14 @@ pub async fn signup_internal(
         return web::Redirect::to("/");
     }
     let collection = state.db.collection::<User>("users");
+    let now = time::OffsetDateTime::now_utc();
     let user = User {
         _id: bson::oid::ObjectId::default(),
         email: params.email.clone(),
         username: params.username.clone(),
         password: params.password.clone(),
+        created_at: now.unix_timestamp(),
+        updated_at: now.unix_timestamp(),
     };
     if collection.insert_one(&user, None).await.is_err() {
         todo!();

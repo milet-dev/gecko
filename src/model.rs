@@ -7,6 +7,8 @@ pub struct Repository {
     pub name: String,
     pub description: String,
     pub visibility: String,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,4 +17,6 @@ pub struct User {
     pub email: String,
     pub username: String,
     pub password: String,
+    pub created_at: i64,
+    pub updated_at: i64,
 }

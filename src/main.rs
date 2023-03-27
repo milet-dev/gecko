@@ -66,7 +66,9 @@ async fn index(state: web::Data<State>, identity: Option<Identity>) -> Result<im
                                 "user_id": "$user_id",
                                 "name": "$name",
                                 "description": "$description",
-                                "visibility": "$visibility"
+                                "visibility": "$visibility",
+                                "created_at": "$created_at",
+                                "updated_at": "$updated_at"
                             }
                         },
                     ],
@@ -95,11 +97,15 @@ async fn index(state: web::Data<State>, identity: Option<Identity>) -> Result<im
                 let name = inner.get_str("name");
                 let description = inner.get_str("description");
                 let visibility = inner.get_str("visibility");
+                let created_at = inner.get_i64("created_at");
+                let updated_at = inner.get_i64("updated_at");
                 Repository {
                     user_id: ObjectId::default(),
                     name: name.unwrap().to_string(),
                     description: description.unwrap().to_string(),
                     visibility: visibility.unwrap().to_string(),
+                    created_at: created_at.unwrap(),
+                    updated_at: updated_at.unwrap(),
                 }
             })
             .collect();
