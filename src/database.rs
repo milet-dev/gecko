@@ -18,12 +18,13 @@ impl Database {
     pub async fn login(&self, username: &str, password: &str) -> Option<User> {
         let collection = self.inner.collection::<User>("users");
         let result = collection
-            .find_one(
-                bson::doc! { "username": username, "password": password },
-                None,
-            )
-            .await;
-        result.unwrap_or(None)
+            .find_one(bson::doc! { "username": username }, None)
+            .await
+            .unwrap();
+        result.filter(|user| {
+            let hash = blake3::hash(format!("{password}{}", &user.salt).as_bytes()).to_string();
+            hash == user.password
+        })
     }
 
     pub async fn find_user(&self, username: &str) -> Option<User> {

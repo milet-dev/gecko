@@ -17,6 +17,7 @@ pub struct User {
     pub email: String,
     pub username: String,
     pub password: String,
+    pub salt: String,
     pub created_at: i64,
     pub updated_at: i64,
 }

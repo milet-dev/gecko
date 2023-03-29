@@ -6,6 +6,7 @@ use actix_identity::Identity;
 use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use askama::Template;
 use askama_actix::TemplateToResponse;
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 
 #[derive(Template)]
@@ -37,11 +38,20 @@ pub async fn signup_internal(
     }
     let collection = state.db.collection::<User>("users");
     let now = time::OffsetDateTime::now_utc();
+
+    let output: String = thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(40)
+        .map(char::from)
+        .collect();
+    let salt = blake3::hash(format!("{output}{}", now.unix_timestamp()).as_bytes()).to_string();
+    let password = blake3::hash(format!("{}{}", params.password, salt).as_bytes()).to_string();
     let user = User {
         _id: bson::oid::ObjectId::default(),
         email: params.email.clone(),
         username: params.username.clone(),
-        password: params.password.clone(),
+        password,
+        salt,
         created_at: now.unix_timestamp(),
         updated_at: now.unix_timestamp(),
     };
@@ -67,17 +77,6 @@ pub async fn login(identity: Option<Identity>) -> impl Responder {
     LoginTemplate { title: "login" }.to_response()
 }
 
-#[get("/logout")]
-pub async fn logout(identity: Option<Identity>) -> impl Responder {
-    match identity {
-        Some(identity) => {
-            identity.logout();
-            HttpResponse::Ok().finish()
-        }
-        None => HttpResponse::Unauthorized().body("Unauthorized"),
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct LoginForm {
     username: String,
@@ -98,6 +97,14 @@ pub async fn login_internal(
     };
 
     Identity::login(&req.extensions(), user.username).unwrap();
+    web::Redirect::to("/").see_other()
+}
+
+#[get("/logout")]
+pub async fn logout(identity: Option<Identity>) -> impl Responder {
+    if let Some(identity) = identity {
+        identity.logout();
+    }
     web::Redirect::to("/").see_other()
 }
 

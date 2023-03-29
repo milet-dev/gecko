@@ -344,7 +344,8 @@ pub async fn tree(
         } else {
             let mut buffer = String::new();
             buffer.push_str("<pre>");
-            for (i, line) in content.lines().enumerate() {
+            for (mut i, line) in content.lines().enumerate() {
+                i += 1;
                 let url = format!("<a class=\"line\" id=\"L{i}\" href=\"/@{username}/{name}/tree/{branch}/{tail}#L{i}\">{i}</a>\t{line}\n");
                 buffer.push_str(&url);
             }
