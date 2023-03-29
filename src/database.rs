@@ -70,7 +70,7 @@ impl Database {
         &self,
         user: &Option<User>,
         name: &str,
-        description: Option<&str>,
+        description: Option<String>,
         visibility: &str,
     ) -> anyhow::Result<(), Error> {
         let Some(user) = user else {
@@ -89,13 +89,14 @@ impl Database {
         }
 
         let now = time::OffsetDateTime::now_utc();
+        let unix_timestamp = now.unix_timestamp();
         let repository = Repository {
             user_id: user._id,
             name: name.to_owned(),
-            description: description.unwrap_or("default").to_owned(),
+            description: description.unwrap_or_default(),
             visibility: visibility.to_owned(),
-            created_at: now.unix_timestamp(),
-            updated_at: now.unix_timestamp(),
+            created_at: unix_timestamp,
+            updated_at: unix_timestamp,
         };
         if collection.insert_one(&repository, None).await.is_err() {
             todo!();

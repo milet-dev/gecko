@@ -38,13 +38,14 @@ pub async fn signup_internal(
     }
     let collection = state.db.collection::<User>("users");
     let now = time::OffsetDateTime::now_utc();
+    let unix_timestamp = now.unix_timestamp();
 
     let output: String = thread_rng()
         .sample_iter(&Alphanumeric)
         .take(40)
         .map(char::from)
         .collect();
-    let salt = blake3::hash(format!("{output}{}", now.unix_timestamp()).as_bytes()).to_string();
+    let salt = blake3::hash(format!("{output}{}", unix_timestamp).as_bytes()).to_string();
     let password = blake3::hash(format!("{}{}", params.password, salt).as_bytes()).to_string();
     let user = User {
         _id: bson::oid::ObjectId::default(),
@@ -52,8 +53,8 @@ pub async fn signup_internal(
         username: params.username.clone(),
         password,
         salt,
-        created_at: now.unix_timestamp(),
-        updated_at: now.unix_timestamp(),
+        created_at: unix_timestamp,
+        updated_at: unix_timestamp,
     };
     if collection.insert_one(&user, None).await.is_err() {
         todo!();
@@ -199,9 +200,14 @@ async fn new_internal(
     let user = state.database.find_user(&username).await;
 
     let repository_name = form.name.clone();
+    let description = if !form.description.is_empty() {
+        Some(form.description.clone())
+    } else {
+        None
+    };
     let result = state
         .database
-        .new_repository(&user, &repository_name, None, &form.visibility)
+        .new_repository(&user, &repository_name, description, &form.visibility)
         .await;
     if result.eq(&Err(crate::database::Error::Found)) {
         eprintln!("Found");
