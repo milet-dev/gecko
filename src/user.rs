@@ -3,7 +3,7 @@ use crate::{
     State,
 };
 use actix_identity::Identity;
-use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse, Responder};
+use actix_web::{get, http::Method, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use askama::Template;
 use askama_actix::TemplateToResponse;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -15,11 +15,6 @@ struct SignupTemplate<'a> {
     title: &'a str,
 }
 
-#[get("/signup")]
-async fn signup() -> impl Responder {
-    SignupTemplate { title: "sign up" }.to_response()
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct SignupForm {
     email: String,
@@ -27,39 +22,51 @@ pub struct SignupForm {
     password: String,
 }
 
-#[post("/signup")]
-pub async fn signup_internal(
+pub async fn signup(
+    req: HttpRequest,
     state: web::Data<State>,
     identity: Option<Identity>,
-    params: web::Form<SignupForm>,
+    params: Option<web::Form<SignupForm>>,
 ) -> impl Responder {
     if identity.is_some() {
-        return web::Redirect::to("/").see_other();
+        return HttpResponse::SeeOther()
+            .insert_header(("Location", "/"))
+            .finish();
     }
-    let collection = state.db.collection::<User>("users");
-    let now = time::OffsetDateTime::now_utc();
-    let unix_timestamp = now.unix_timestamp();
+    match *req.method() {
+        Method::GET => SignupTemplate { title: "sign up" }.to_response(),
+        Method::POST => {
+            let params = params.unwrap();
+            let collection = state.db.collection::<User>("users");
+            let now = time::OffsetDateTime::now_utc();
+            let unix_timestamp = now.unix_timestamp();
 
-    let output: String = thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(40)
-        .map(char::from)
-        .collect();
-    let salt = blake3::hash(format!("{output}{}", unix_timestamp).as_bytes()).to_string();
-    let password = blake3::hash(format!("{}{}", params.password, salt).as_bytes()).to_string();
-    let user = User {
-        _id: bson::oid::ObjectId::default(),
-        email: params.email.clone(),
-        username: params.username.clone(),
-        password,
-        salt,
-        created_at: unix_timestamp,
-        updated_at: unix_timestamp,
-    };
-    if collection.insert_one(&user, None).await.is_err() {
-        todo!();
+            let output: String = thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(40)
+                .map(char::from)
+                .collect();
+            let salt = blake3::hash(format!("{output}{}", unix_timestamp).as_bytes()).to_string();
+            let password =
+                blake3::hash(format!("{}{}", params.password, salt).as_bytes()).to_string();
+            let user = User {
+                _id: bson::oid::ObjectId::default(),
+                email: params.email.clone(),
+                username: params.username.clone(),
+                password,
+                salt,
+                created_at: unix_timestamp,
+                updated_at: unix_timestamp,
+            };
+            if collection.insert_one(&user, None).await.is_err() {
+                todo!();
+            }
+            HttpResponse::SeeOther()
+                .insert_header(("Location", "/login"))
+                .finish()
+        }
+        _ => unimplemented!(),
     }
-    web::Redirect::to("/login").see_other()
 }
 
 #[derive(Template)]
@@ -68,37 +75,41 @@ struct LoginTemplate<'a> {
     title: &'a str,
 }
 
-#[get("/login")]
-pub async fn login(identity: Option<Identity>) -> impl Responder {
-    if identity.is_some() {
-        return HttpResponse::SeeOther()
-            .insert_header(("Location", "/"))
-            .finish();
-    }
-    LoginTemplate { title: "login" }.to_response()
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct LoginForm {
     username: String,
     password: String,
 }
 
-#[post("/login")]
-pub async fn login_internal(
-    state: web::Data<State>,
+pub async fn login(
     req: HttpRequest,
-    params: web::Form<LoginForm>,
+    state: web::Data<State>,
+    identity: Option<Identity>,
+    params: Option<web::Form<LoginForm>>,
 ) -> impl Responder {
-    let username = params.username.clone();
-    let password = params.password.clone();
-
-    let Some(user) = state.database.login(&username, &password).await else {
-        return web::Redirect::to("/login").see_other();
-    };
-
-    Identity::login(&req.extensions(), user.username).unwrap();
-    web::Redirect::to("/").see_other()
+    if identity.is_some() {
+        return HttpResponse::SeeOther()
+            .insert_header(("Location", "/"))
+            .finish();
+    }
+    match *req.method() {
+        Method::GET => LoginTemplate { title: "login" }.to_response(),
+        Method::POST => {
+            let params = params.unwrap();
+            let username = params.username.clone();
+            let password = params.password.clone();
+            let Some(user) = state.database.login(&username, &password).await else {
+                return HttpResponse::SeeOther()
+                    .insert_header(("Location", "/login"))
+                    .finish();
+            };
+            Identity::login(&req.extensions(), user.username).unwrap();
+            HttpResponse::SeeOther()
+                .insert_header(("Location", "/login"))
+                .finish()
+        }
+        _ => unimplemented!(),
+    }
 }
 
 #[get("/logout")]
@@ -163,21 +174,6 @@ struct NewRepositoryTemplate<'a> {
     title: &'a str,
 }
 
-#[get("/new")]
-async fn new(state: web::Data<State>, identity: Option<Identity>) -> impl Responder {
-    let Some(identity) = identity else {
-        return HttpResponse::Unauthorized().body("Unauthorized");
-    };
-
-    let username = identity.id().unwrap();
-
-    if state.database.find_user(&username).await.is_none() {
-        return HttpResponse::Unauthorized().body("Unauthorized");
-    }
-
-    NewRepositoryTemplate { title: "" }.to_response()
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct NewRepositoryForm {
     name: String,
@@ -185,34 +181,55 @@ pub struct NewRepositoryForm {
     visibility: String,
 }
 
-#[post("/new")]
-async fn new_internal(
+pub async fn new(
+    req: HttpRequest,
     state: web::Data<State>,
     identity: Option<Identity>,
-    form: web::Form<NewRepositoryForm>,
+    form: Option<web::Form<NewRepositoryForm>>,
 ) -> impl Responder {
     let Some(identity) = identity else {
-        return web::Redirect::to("/").see_other();
+        return HttpResponse::SeeOther()
+            .insert_header(("Location", "/"))
+            .finish();
     };
 
     let username = identity.id().unwrap();
 
-    let user = state.database.find_user(&username).await;
-
-    let repository_name = form.name.clone();
-    let description = if !form.description.is_empty() {
-        Some(form.description.clone())
-    } else {
-        None
-    };
-    let result = state
-        .database
-        .new_repository(&user, &repository_name, description, &form.visibility)
-        .await;
-    if result.eq(&Err(crate::database::Error::Found)) {
-        eprintln!("Found");
-        return web::Redirect::to("/new").see_other();
+    if state.database.find_user(&username).await.is_none() {
+        return HttpResponse::SeeOther()
+            .insert_header(("Location", "/"))
+            .finish();
     }
 
-    web::Redirect::to(format!("/@{username}/{}", form.name)).see_other()
+    match *req.method() {
+        Method::GET => NewRepositoryTemplate { title: "" }.to_response(),
+        Method::POST => {
+            let form = form.unwrap();
+
+            let username = identity.id().unwrap();
+
+            let user = state.database.find_user(&username).await;
+
+            let repository_name = form.name.clone();
+            let description = if !form.description.is_empty() {
+                Some(form.description.clone())
+            } else {
+                None
+            };
+            let result = state
+                .database
+                .new_repository(&user, &repository_name, description, &form.visibility)
+                .await;
+            if result.eq(&Err(crate::database::Error::Found)) {
+                return HttpResponse::SeeOther()
+                    .insert_header(("Location", "/new"))
+                    .finish();
+            }
+
+            HttpResponse::SeeOther()
+                .insert_header(("Location", format!("/@{username}/{}", form.name)))
+                .finish()
+        }
+        _ => unimplemented!(),
+    }
 }

@@ -159,27 +159,42 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(client.clone()))
             .app_data(web::Data::new(state.clone()))
             .service(Files::new("/static", "static"))
-            .service(user::signup)
-            .service(user::signup_internal)
-            .service(user::login)
-            .service(user::login_internal)
+            .service(
+                web::resource("/signup")
+                    .route(web::get().to(user::signup))
+                    .route(web::post().to(user::signup)),
+            )
+            .service(
+                web::resource("/login")
+                    .route(web::get().to(user::login))
+                    .route(web::post().to(user::login)),
+            )
+            .service(
+                web::resource("/new")
+                    .route(web::get().to(user::new))
+                    .route(web::post().to(user::new)),
+            )
             .service(user::logout)
-            .service(user::new)
-            .service(user::new_internal)
-            .service(index)
             .service(user::index)
+            .service(index)
             .service(repository::delete)
             .service(
                 web::scope("/@{username}")
                     .service(repository::index)
                     .service(
                         web::scope("/{name}")
-                            .service(repository::diff)
-                            .service(repository::_tree)
-                            .route("/tree/{branch}/{tail}*", web::get().to(repository::tree))
-                            .route("/blob/{branch}/{tail}*", web::get().to(repository::tree))
-                            .service(repository::_commits)
-                            .service(repository::commits),
+                            .route("/commit/{id}", web::get().to(repository::diff))
+                            .service(
+                                web::scope("/tree/{branch}")
+                                    .default_service(web::get().to(repository::tree))
+                                    .route("/{tail}*", web::get().to(repository::tree_)),
+                            )
+                            .route("/blob/{branch}/{tail}*", web::get().to(repository::tree_))
+                            .service(
+                                web::scope("/commits")
+                                    .default_service(web::get().to(repository::commits))
+                                    .route("/{branch}", web::get().to(repository::commits)),
+                            ),
                     ),
             )
     })

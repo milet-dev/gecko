@@ -179,8 +179,7 @@ struct FileTemplate<'a> {
     size: &'a str,
 }
 
-#[get("/tree/{branch}")]
-pub async fn _tree(
+pub async fn tree(
     path: web::Path<(String, String, String)>,
     state: web::Data<State>,
     identity: Option<Identity>,
@@ -284,7 +283,7 @@ pub struct Query {
     raw: Option<bool>,
 }
 
-pub async fn tree(
+pub async fn tree_(
     path: web::Path<(String, String, String, String)>,
     query: web::Query<Query>,
     state: web::Data<State>,
@@ -482,13 +481,17 @@ struct CommitsTemplate<'a> {
     commits: &'a [Commit],
 }
 
-#[get("/commits")]
 pub async fn commits(
-    path: web::Path<(String, String)>,
+    path: web::Path<Vec<String>>,
     state: web::Data<State>,
     identity: Option<Identity>,
 ) -> Result<impl Responder> {
-    let (username, name) = path.into_inner();
+    let path = path.into_inner();
+    let (username, name, branch) = if path.len() == 2 {
+        (&path[0], &path[1], None)
+    } else {
+        (&path[0], &path[1], Some(&path[2]))
+    };
 
     let identity = match identity {
         Some(identity) => match identity.id() {
@@ -498,77 +501,48 @@ pub async fn commits(
         None => None,
     };
 
-    let user = state.database.find_user(&username).await;
+    let user = state.database.find_user(username).await;
 
-    let repo = git2::Repository::open(name.clone()).unwrap();
+    let repo = git2::Repository::open(name).unwrap();
 
-    let mut revwalk = repo.revwalk().unwrap();
-    revwalk.push_head().unwrap();
     let mut commits = Vec::new();
-    for commit in revwalk {
-        let oid = commit.unwrap();
-        let commit = repo.find_commit(oid).unwrap();
+    match branch {
+        Some(branch) => {
+            let commit = {
+                if let Ok(inner) = repo.find_branch(branch, git2::BranchType::Local) {
+                    inner.get().peel_to_commit().unwrap()
+                } else {
+                    repo.find_commit(Oid::from_str(branch).unwrap()).unwrap()
+                }
+            };
 
-        commits.push(Commit {
-            id: commit.id().to_string(),
-            message: commit.message().unwrap().to_string(),
-            author: Author {
-                name: commit.author().name().unwrap().to_owned(),
-                email: commit.author().email().unwrap().to_owned(),
-            },
-        });
+            push_log(&commit, &mut commits);
+        }
+        None => {
+            let mut revwalk = repo.revwalk().unwrap();
+            revwalk.push_head().unwrap();
+            for commit in revwalk {
+                let oid = commit.unwrap();
+                let commit = repo.find_commit(oid).unwrap();
+                let author = commit.author();
+                commits.push(Commit {
+                    id: commit.id().to_string(),
+                    message: commit.message().unwrap().to_string(),
+                    author: Author {
+                        name: author.name().unwrap_or_default().to_owned(),
+                        email: author.email().unwrap_or_default().to_owned(),
+                    },
+                });
+            }
+        }
     }
 
     Ok(CommitsTemplate {
-        name: &name,
-        username: &username,
+        name,
+        username,
         user: &user,
         identity: &identity,
         commits: &commits,
-    }
-    .to_response())
-}
-
-#[get("/commits/{branch}")]
-pub async fn _commits(
-    path: web::Path<(String, String, String)>,
-    state: web::Data<State>,
-    identity: Option<Identity>,
-) -> Result<impl Responder> {
-    let (username, name, branch) = path.into_inner();
-
-    let _identity = match identity {
-        Some(identity) => {
-            let Ok(id) = identity.id() else {
-                return Ok(HttpResponse::NotFound().finish());
-            };
-            state.database.find_user(&id).await
-        }
-        None => None,
-    };
-
-    let user = state.database.find_user(&username).await;
-
-    let repo = git2::Repository::open(name.clone()).unwrap();
-
-    let mut log = vec![];
-
-    let commit = {
-        if let Ok(inner) = repo.find_branch(&branch, git2::BranchType::Local) {
-            inner.get().peel_to_commit().unwrap()
-        } else {
-            repo.find_commit(Oid::from_str(&branch).unwrap()).unwrap()
-        }
-    };
-
-    push_log(&commit, &mut log);
-
-    Ok(CommitsTemplate {
-        name: &name,
-        username: &username,
-        user: &user,
-        identity: &_identity,
-        commits: &log,
     }
     .to_response())
 }
@@ -590,7 +564,6 @@ pub struct CommitTemplate<'a> {
     diff: &'a Diff,
 }
 
-#[get("/commit/{id}")]
 pub async fn diff(path: web::Path<(String, String, String)>) -> Result<impl Responder> {
     let (username, name, id) = path.into_inner();
 
