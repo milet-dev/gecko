@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>{{ commit.summary }}</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #0f0f0f;
+            color: #f1f1f1;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            letter-spacing: 0.03em;
+            font-weight: 400;
+        }
+
+        ::selection {
+            background-color: rgb(63, 68, 70);
+            color: rgb(120, 123, 125);
+        }
+
+        pre {
+            font-family: 'Cascadia Code';
+            font-size: 0.8rem;
+            font-weight: 400;
+            line-height: 0.9;
+        }
+
+        a {
+            color: #e7e7e8;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .lines {
+            display: flex;
+            width: 100%;
+            height: auto;
+            flex-direction: column;
+            row-gap: 0;
+        }
+
+        .lines .line {
+            height: 20px;
+            width: auto;
+        }
+
+        .lines .line .text {
+            margin-top: -9px;
+        }
+
+        .line-numbers {
+            float: left;
+            width: 100px;
+            height: 20px !important;
+            font-size: 0.8rem;
+            user-select: none;
+            color: #b5b5bb;
+        }
+
+        .line-numbers .new {
+            float: left;
+            text-align: center;
+            background-color: rgba(125, 219, 55, 0.4);
+            width: 40px;
+            height: 20px !important;
+        }
+
+        .line-numbers .old {
+            float: left;
+            text-align: center;
+            background-color: rgba(251, 74, 74, 0.4);
+            width: 40px;
+            height: 20px !important;
+        }
+
+        .line-numbers .none {
+            float: left;
+            text-align: center;
+            background-color: transparent;
+            width: 80px;
+            height: 20px !important;
+        }
+
+        .stats {
+            float: left;
+            font-size: .9rem;
+            margin: 10px;
+        }
+
+        .insertions {
+            color: rgb(125, 219, 55);
+        }
+
+        .deletions {
+            color: rgb(251, 74, 74);
+        }
+
+        .context {
+            color: rgb(139, 144, 147);
+        }
+
+        .information {
+            right: 10px;
+            font-size: .8rem !important;
+            margin: 10px;
+            position: absolute;
+        }
+
+        .information .tree {
+            right: 10px;
+            font-size: 0.95rem !important;
+            margin-top: -41px;
+            position: absolute;
+        }
+    </style>
+</head>
+
+<body>
+    <div style="margin: 10px;">
+        <a href="/@{{ username }}" style="color: #70c5bf; font-size: 1.4rem;">@{{ username }}</a>
+        <span style="font-size: 1.4rem;">/</span>
+        <a href="/@{{ username }}/{{ name }}" style="font-size: 1.4rem;">{{
+            name }}</a>
+    </div>
+    <div style="margin: 10px;">
+        <span>{{ commit.summary }} {{ commit.time }}</span>
+    </div>
+    <div style="margin: 10px;">
+        <span>{{ commit.author.name }} - {{ commit.author.email }}</span>
+    </div>
+    <div style="font-size: .9rem; width: 100%; height: 60px;">
+        <div class="stats">
+            <span style="font-weight: 700;">{{ diff.stats.files_changed() }}</span> files changed,
+            <span class="insertions" style="font-weight: 700;">{{ diff.stats.insertions() }}</span> insertions(+),
+            <span class="deletions" style="font-weight: 700;">{{ diff.stats.deletions() }}</span> deletions(-)
+        </div>
+        <div class="information">
+            <div class="tree">
+                <a href="/@{{ username }}/{{ name }}/tree/{{ commit.id }}" style="color: #70c5bf;">tree</a>
+            </div>
+            <span style="color: #8b9093;">{{ commit.parent_ids.len() }} {% if commit.parent_ids.len() == 0 ||
+                commit.parent_ids.len() > 1 %}parents{% else %}parent{% endif %}</span>
+            {% for parent_id in commit.parent_ids %}
+            <a href="/@{{ username }}/{{ name }}/commit/{{ parent_id }}">{{ parent_id[0..8] }}</a>
+            {% if (loop.index - 1) != commit.parent_ids.len() - 1 %}<span
+                style="color: #8b9093; font-size: .78rem;">+</span>{% endif %}
+            {% endfor %}
+            <span style="margin-left: 12px; color: #8b9093;">commit</span> <span style="color: #fff;">{{ commit.id[0..8]
+                }}</span>
+        </div>
+    </div>
+    {% for file in diff.files %}
+
+    {% let hash = file.hash.as_str() %}
+
+    <div id="diff-{{ hash }}" style="margin-top: 15px; background-color: #272a2f; height: 35px;">
+        <div style="padding-left: 10px; padding-top: 6px;">
+            <span><a style="float: left;" href="#diff-{{ hash }}">{{ file.name }}</a></span>
+            <span style="margin-left: 10px; color: #8b9093;">(<a
+                    href="/@{{ username }}/{{ name }}/blob/{{ commit.id }}/{{ file.name }}"
+                    style="font-size: 0.89rem; color: #8b9093;">view
+                    file</a>)</span>
+            <span style="right: 0; position: absolute; margin-right: 10px; margin-top: 1px; font-size: .9rem;">
+                (<span style="color: #e7e7e8; font-weight: 700;">{{ file.stats.insertions + file.stats.deletions
+                    }}</span> changes)
+                <span style="font-weight: 700;" class="insertions">{{ file.stats.insertions }}</span> insertions(+),
+                <span style="font-weight: 700;" class="deletions">{{ file.stats.deletions }}</span> deletions(-)
+            </span>
+        </div>
+    </div>
+    <div class="lines" style="margin-top: 3px;">
+        {% for data in file.data %}
+
+        {% let content = data.content.as_str() %}
+        {% let old_lineno = data.old_lineno %}
+        {% let new_lineno = data.new_lineno %}
+        {% let origin = data.origin %}
+
+        {% let git_diff_line_context = 0 %}
+        {% let git_diff_line_addition = 1 %}
+        {% let git_diff_line_deletion = 2 %}
+        {% let git_diff_line_context_eofnl = 3 %}
+        {% let git_diff_line_add_eofnl = 4 %}
+        {% let git_diff_line_del_eofnl = 5 %}
+        {% let git_diff_line_file_hdr = 6 %}
+        {% let git_diff_line_hunk_hdr = 7 %}
+        {% let git_diff_line_binary = 8 %}
+
+        {% if origin == git_diff_line_hunk_hdr %}
+        <div class="line">
+            <span class="line-numbers">
+                <span class="none"></span>
+            </span>
+            <pre><div class="text"><span class="context">{{ content }}</span></div></pre>
+        </div>
+        {% else if origin == git_diff_line_addition %}
+        <div class="line" id="diff-{{ hash }}R{{ new_lineno }}">
+            <span class="line-numbers">
+                <div class="new" id="diff-{{ hash }}L{{ old_lineno }}">
+                    {% if old_lineno > -1 %}
+                    <a href="/@{{ username }}/{{ name }}/commit/{{ commit.id }}#diff-{{ hash }}L{{ old_lineno }}">{{
+                        old_lineno }}</a>
+                    {% endif %}
+                </div>
+                <div class="new" id="diff-{{ hash }}R{{ new_lineno }}">
+                    {% if new_lineno > -1 %}
+                    <a href="/@{{ username }}/{{ name }}/commit/{{ commit.id }}#diff-{{ hash }}R{{ new_lineno }}">{{
+                        new_lineno }}</a>
+                    {% endif %}
+                </div>
+            </span>
+            <pre><div class="text"><span class="insertions"><span style="user-select: none;">+</span> {{ content }}</span></div></pre>
+        </div>
+        {% else if origin == git_diff_line_deletion %}
+        <div class="line">
+            <span class="line-numbers">
+                <div class="old" id="diff-{{ hash }}L{{ old_lineno }}">
+                    {% if old_lineno > -1 %}
+                    <a href="/@{{ username }}/{{ name }}/commit/{{ commit.id }}#diff-{{ hash }}L{{ old_lineno }}">{{
+                        old_lineno }}</a>
+                    {% endif %}
+                </div>
+                <div class="old" id="diff-{{ hash }}R{{ new_lineno }}">
+                    {% if new_lineno > -1 %}
+                    <a href="/@{{ username }}/{{ name }}/commit/{{ commit.id }}#diff-{{ hash }}R{{ new_lineno }}">{{
+                        new_lineno }}</a>
+                    {% endif %}
+                </div>
+            </span>
+            <pre><div class="text"><span class="deletions"><span style="user-select: none;">-</span> {{ content }}</span></div></pre>
+        </div>
+        {% else if origin == git_diff_line_add_eofnl || origin == git_diff_line_del_eofnl || origin ==
+        git_diff_line_context_eofnl %}
+        <div class="line" style="margin-left: 15px;">
+            <span class="line-numbers">
+                <span class="none"></span>
+            </span>
+            <pre><div class="text"><span class="context">{{ content }}</span></div></pre>
+        </div>
+        {% else %}
+        <div class="line">
+            <span class="line-numbers">
+                <div class="old" style="background-color: transparent;" id="diff-{{ hash }}L{{ old_lineno }}">
+                    {% if old_lineno > -1 %}
+                    <a href="/@{{ username }}/{{ name }}/commit/{{ commit.id }}#diff-{{ hash }}L{{ old_lineno }}">{{
+                        old_lineno }}</a>
+                    {% endif %}
+                </div>
+                <div class="new" style="background-color: transparent;" id="diff-{{ hash }}R{{ new_lineno }}">
+                    {% if new_lineno > -1 %}
+                    <a href="/@{{ username }}/{{ name }}/commit/{{ commit.id }}#diff-{{ hash }}R{{ new_lineno }}">{{
+                        new_lineno }}</a>
+                    {% endif %}
+                </div>
+            </span>
+            <pre><div class="text">  {{ content }}</div></pre>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endfor %}
+</body>
+
+</html>

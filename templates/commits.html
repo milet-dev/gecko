@@ -11,7 +11,8 @@
             {% for commit in commits %}
             <li>
                 <p>{{ commit.message }} (<a style="color: #70c5bf;"
-                        href="/@{{ username }}/{{ name }}/tree/{{ commit.id }}">{{ commit.id[0..8] }}</a>)</p>
+                        href="/@{{ username }}/{{ name }}/commit/{{ commit.id }}">{{ commit.id[0..8] }}</a>) <a
+                        style="color: #70c5bf;" href="/@{{ username }}/{{ name }}/tree/{{ commit.id }}">tree</a></p>
                 <p>{{ commit.author.name }} - {{ commit.author.email }}</p>
             </li>
             {% endfor %}

@@ -1,4 +1,5 @@
 use crate::{
+    diff::Diff,
     model::{self, User},
     State,
 };
@@ -8,6 +9,7 @@ use askama::Template;
 use askama_actix::TemplateToResponse;
 use git2::Oid;
 use std::path::Path;
+use time::{OffsetDateTime, UtcOffset};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Kind {
@@ -282,7 +284,6 @@ pub struct Query {
     raw: Option<bool>,
 }
 
-#[get("/tree/{branch}/{tail}*")]
 pub async fn tree(
     path: web::Path<(String, String, String, String)>,
     query: web::Query<Query>,
@@ -568,6 +569,72 @@ pub async fn _commits(
         user: &user,
         identity: &_identity,
         commits: &log,
+    }
+    .to_response())
+}
+
+pub struct DiffCommit {
+    id: String,
+    parent_ids: Vec<String>,
+    author: Author,
+    summary: String,
+    time: String,
+}
+
+#[derive(Template)]
+#[template(path = "commit.html")]
+pub struct CommitTemplate<'a> {
+    username: &'a str,
+    name: &'a str,
+    commit: DiffCommit,
+    diff: &'a Diff,
+}
+
+#[get("/commit/{id}")]
+pub async fn diff(path: web::Path<(String, String, String)>) -> Result<impl Responder> {
+    let (username, name, id) = path.into_inner();
+
+    let repo = git2::Repository::open(&name).unwrap();
+    let commit = repo.find_commit(Oid::from_str(&id).unwrap()).unwrap();
+    let summary = commit.summary().unwrap_or_default();
+    let time = commit.time();
+
+    let parent_ids: Vec<_> = commit
+        .parent_ids()
+        .map(|parent_id| parent_id.to_string())
+        .collect();
+
+    let offset = UtcOffset::from_whole_seconds(time.offset_minutes() * 60).unwrap();
+    let time = OffsetDateTime::from_unix_timestamp(time.seconds())
+        .unwrap()
+        .to_offset(offset);
+
+    let diff = Diff::new(&repo, &id);
+
+    let author = Author {
+        name: commit
+            .author()
+            .name()
+            .map(|inner| inner.to_string())
+            .unwrap_or_default(),
+        email: commit
+            .author()
+            .email()
+            .map(|inner| inner.to_string())
+            .unwrap_or_default(),
+    };
+
+    Ok(CommitTemplate {
+        username: &username,
+        name: &name,
+        commit: DiffCommit {
+            id,
+            parent_ids,
+            author,
+            summary: summary.to_string(),
+            time: time.to_string(),
+        },
+        diff: &diff,
     }
     .to_response())
 }

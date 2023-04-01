@@ -1,4 +1,5 @@
 mod database;
+mod diff;
 mod model;
 mod repository;
 mod user;
@@ -173,8 +174,10 @@ async fn main() -> std::io::Result<()> {
                     .service(repository::index)
                     .service(
                         web::scope("/{name}")
+                            .service(repository::diff)
                             .service(repository::_tree)
-                            .service(repository::tree)
+                            .route("/tree/{branch}/{tail}*", web::get().to(repository::tree))
+                            .route("/blob/{branch}/{tail}*", web::get().to(repository::tree))
                             .service(repository::_commits)
                             .service(repository::commits),
                     ),

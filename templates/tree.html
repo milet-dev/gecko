@@ -12,9 +12,11 @@
     <a href="/@{{ username }}/{{ name }}/commits/{{ branch }}">commits</a>
 
     <div style="max-width: 800px;">
-        <p>{{ commit.message }}</p>
+        <p>{{ commit.message }} (<a href="/@{{ username }}/{{ name }}/commit/{{ commit.id }}" style="color: #70c5bf;">{{
+                commit.id[0..8] }}</a>)</p>
         <p>{{ commit.author.name }} - {{ commit.author.email }}</p>
     </div>
+
     <ul>
         {% for entry in entries %}
         <li>
