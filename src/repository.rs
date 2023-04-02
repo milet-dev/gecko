@@ -11,6 +11,8 @@ use git2::Oid;
 use std::path::Path;
 use time::{OffsetDateTime, UtcOffset};
 
+const MAX_COMMIT_LEN: usize = 20;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Kind {
     Tree,
@@ -477,20 +479,28 @@ struct CommitsTemplate<'a> {
     user: &'a Option<User>,
     identity: &'a Option<User>,
     username: &'a str,
+    branch: &'a Option<&'a str>,
     name: &'a str,
     commits: &'a [Commit],
+    parent_count: usize,
+}
+
+#[derive(serde::Deserialize)]
+pub struct CommitsQuery {
+    from: Option<String>,
 }
 
 pub async fn commits(
     path: web::Path<Vec<String>>,
     state: web::Data<State>,
     identity: Option<Identity>,
+    query: web::Query<CommitsQuery>,
 ) -> Result<impl Responder> {
     let path = path.into_inner();
     let (username, name, branch) = if path.len() == 2 {
         (&path[0], &path[1], None)
     } else {
-        (&path[0], &path[1], Some(&path[2]))
+        (&path[0], &path[1], Some(path[2].as_str()))
     };
 
     let identity = match identity {
@@ -506,43 +516,64 @@ pub async fn commits(
     let repo = git2::Repository::open(name).unwrap();
 
     let mut commits = Vec::new();
+
     match branch {
         Some(branch) => {
-            let commit = {
-                if let Ok(inner) = repo.find_branch(branch, git2::BranchType::Local) {
-                    inner.get().peel_to_commit().unwrap()
-                } else {
-                    repo.find_commit(Oid::from_str(branch).unwrap()).unwrap()
+            let commit = match query.from.as_ref() {
+                Some(from) => {
+                    let oid = Oid::from_str(from).unwrap();
+                    repo.find_commit(oid).unwrap()
+                }
+                None => {
+                    if let Ok(branch) = repo.find_branch(branch, git2::BranchType::Local) {
+                        branch.get().peel_to_commit().unwrap()
+                    } else {
+                        repo.find_commit(Oid::from_str(branch).unwrap()).unwrap()
+                    }
                 }
             };
-
-            push_log(&commit, &mut commits);
+            push_log(&commit, &mut commits, Some(MAX_COMMIT_LEN));
         }
         None => {
-            let mut revwalk = repo.revwalk().unwrap();
-            revwalk.push_head().unwrap();
-            for commit in revwalk {
-                let oid = commit.unwrap();
-                let commit = repo.find_commit(oid).unwrap();
-                let author = commit.author();
-                commits.push(Commit {
-                    id: commit.id().to_string(),
-                    message: commit.message().unwrap().to_string(),
-                    author: Author {
-                        name: author.name().unwrap_or_default().to_owned(),
-                        email: author.email().unwrap_or_default().to_owned(),
-                    },
-                });
+            if let Some(from) = query.from.as_ref() {
+                let commit = repo.find_commit(Oid::from_str(from).unwrap()).unwrap();
+                push_log(&commit, &mut commits, Some(MAX_COMMIT_LEN));
+            } else {
+                let mut revwalk = repo.revwalk().unwrap();
+                revwalk.push_head().unwrap();
+                for (_, commit) in revwalk.enumerate().take_while(|(i, _)| *i < MAX_COMMIT_LEN) {
+                    let oid = commit.unwrap();
+                    let commit = repo.find_commit(oid).unwrap();
+                    let author = commit.author();
+                    commits.push(Commit {
+                        id: commit.id().to_string(),
+                        message: commit.message().unwrap().to_string(),
+                        author: Author {
+                            name: author.name().unwrap_or_default().to_owned(),
+                            email: author.email().unwrap_or_default().to_owned(),
+                        },
+                    });
+                }
             }
         }
     }
+
+    let parent_count = {
+        let last_id = commits.last().unwrap();
+        let last_commit = repo
+            .find_commit(Oid::from_str(&last_id.id).unwrap())
+            .unwrap();
+        last_commit.parent_count()
+    };
 
     Ok(CommitsTemplate {
         name,
         username,
         user: &user,
+        branch: &branch,
         identity: &identity,
         commits: &commits,
+        parent_count,
     }
     .to_response())
 }
@@ -612,7 +643,12 @@ pub async fn diff(path: web::Path<(String, String, String)>) -> Result<impl Resp
     .to_response())
 }
 
-fn push_log(commit: &git2::Commit, log: &mut Vec<Commit>) {
+fn push_log(commit: &git2::Commit, log: &mut Vec<Commit>, limit: Option<usize>) {
+    if let Some(limit) = limit {
+        if log.len() == limit {
+            return;
+        }
+    }
     log.push(Commit {
         id: commit.id().to_string(),
         message: commit.summary().unwrap().to_string(),
@@ -624,7 +660,7 @@ fn push_log(commit: &git2::Commit, log: &mut Vec<Commit>) {
     let Ok(parent) = commit.parent(0) else {
         return;
     };
-    push_log(&parent, log);
+    push_log(&parent, log, limit);
 }
 
 #[get("/delete/{name}")]

@@ -1,9 +1,14 @@
 {% include "shared/header.html" %}
 
 <div style="position: relative; margin: 30px;">
-    <div style="font-size: 1.5rem; font-weight: 700;">
-        <a href="/@{{ username }}/{{ name }}">@{{ username }}</a>/<a
-            href="/@{{ username }}/{{ name }}/tree/{{ commits[0].id }}">{{ name }}</a>
+    <div style="font-size: 1.5rem; font-weight: 600;">
+        <a href="/@{{ username }}/{{ name }}">@{{ username }}</a> /
+        {% match branch %}
+        {% when Some with (val) %}
+        <a href="/@{{ username }}/{{ name }}/tree/{{ val }}">{{ name }}</a>
+        {% when None %}
+        <a href="/@{{ username }}/{{ name }}">{{ name }}</a>
+        {% endmatch %}
     </div>
 
     <div style="max-width: 800px;">
@@ -17,6 +22,13 @@
             </li>
             {% endfor %}
         </ul>
+    </div>
+
+    <div>
+        {% if parent_count > 0 %}
+        {% let last = commits.last().unwrap() %}
+        <a href="?from={{ last.id }}">next</a>
+        {% endif %}
     </div>
 </div>
 
