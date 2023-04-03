@@ -53,14 +53,14 @@ impl Database {
         cursor.try_collect::<Vec<_>>().await.ok()
     }
 
-    pub async fn find_repository(&self, user: &Option<User>, name: &str) -> Option<Repository> {
+    pub async fn find_repository(&self, user: Option<&User>, name: &str) -> Option<Repository> {
         let filter = match user {
             Some(user) => bson::doc! { "user_id": user._id, "name": name },
             None => bson::doc! { "name": name },
         };
         let collection = self.inner.collection::<Repository>("repositories");
         let find_options = FindOneOptions::builder()
-            .projection(bson::doc! { "user_id": ObjectId::default(), "name": 1, "description": 1, "visibility": 1, "created_at": 1, "updated_at": 1 })
+            .projection(bson::doc! { "user_id": 1, "name": 1, "description": 1, "visibility": 1, "created_at": 1, "updated_at": 1 })
             .build();
         let result = collection.find_one(filter, find_options).await;
         result.unwrap_or(None)

@@ -81,7 +81,7 @@ pub async fn index(
 
     let user = state.database.find_user(&username).await;
 
-    let Some(repository) = state.database.find_repository(&user, &name).await else {
+    let Some(repository) = state.database.find_repository(user.as_ref(), &name).await else {
         return Ok(HttpResponse::Ok().finish());
     };
 
@@ -198,7 +198,7 @@ pub async fn tree(
 
     let user = state.database.find_user(&username).await;
 
-    let Some(repository) = state.database.find_repository(&user, &name).await else {
+    let Some(repository) = state.database.find_repository(user.as_ref(), &name).await else {
         return Ok(HttpResponse::Ok().finish());
     };
 
@@ -303,7 +303,7 @@ pub async fn tree_(
 
     let user = state.database.find_user(&username).await;
 
-    let Some(repository) = state.database.find_repository(&user, &name).await else {
+    let Some(repository) = state.database.find_repository(user.as_ref(), &name).await else {
         return Ok(HttpResponse::Ok().finish());
     };
 
