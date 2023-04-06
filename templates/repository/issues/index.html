@@ -1,0 +1,24 @@
+{% include "shared/header.html" %}
+
+<div style="position: relative; margin: 30px;">
+    <div style="font-size: 1.2rem; font-weight: 700;">
+        <a href="/@{{ username }}">@{{ username }}</a> / <a href="/@{{ username }}/{{ name }}">{{ name }}</a>
+    </div>
+
+    <div style="max-width: 800px;">
+        <div style="margin-top: 20px; font-size: 1rem;">
+            <span style="font-weight: 700;">Issues ({{ issues.len() }})</span> <a href="/@{{ username }}/{{ name }}/issues/new">new issue</a>
+        </div>
+
+        <ul>
+            {% for issue in issues %}
+            <li>
+                <span style="color: rgb(139, 144, 147);">(#{{ issue.index }})</span>
+                <a href="/@{{ username }}/{{ name }}/issues/{{ issue.index }}">{{ issue.title }}</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+{% include "shared/footer.html" %}

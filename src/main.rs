@@ -1,5 +1,6 @@
 mod database;
 mod diff;
+mod issues;
 mod model;
 mod repository;
 mod user;
@@ -38,6 +39,7 @@ pub struct User_ {
 #[derive(Template)]
 #[template(path = "index.html")]
 struct IndexTemplate<'a> {
+    title: &'a str,
     identity: &'a Option<User>,
     users: &'a [User_],
 }
@@ -101,12 +103,14 @@ async fn index(state: web::Data<State>, identity: Option<Identity>) -> Result<im
                 let created_at = inner.get_i64("created_at");
                 let updated_at = inner.get_i64("updated_at");
                 Repository {
+                    _id: ObjectId::new(),
                     user_id: ObjectId::default(),
                     name: name.unwrap().to_string(),
                     description: description.unwrap().to_string(),
                     visibility: visibility.unwrap().to_string(),
                     created_at: created_at.unwrap(),
                     updated_at: updated_at.unwrap(),
+                    issues: vec![],
                 }
             })
             .collect();
@@ -126,6 +130,7 @@ async fn index(state: web::Data<State>, identity: Option<Identity>) -> Result<im
     }
 
     Ok(IndexTemplate {
+        title: "gecko",
         identity: &identity,
         users: &users,
     }
@@ -194,6 +199,20 @@ async fn main() -> std::io::Result<()> {
                                 web::scope("/commits")
                                     .default_service(web::get().to(repository::commits))
                                     .route("/{branch}", web::get().to(repository::commits)),
+                            )
+                            .service(
+                                web::scope("/issues")
+                                    .default_service(web::get().to(issues::index))
+                                    .service(
+                                        web::resource("/new")
+                                            .route(web::get().to(issues::new))
+                                            .route(web::post().to(issues::new)),
+                                    )
+                                    .service(
+                                        web::scope("/{issue_id}")
+                                            .default_service(web::get().to(issues::view))
+                                            .route("/add", web::post().to(issues::add_comment)),
+                                    ),
                             ),
                     ),
             )

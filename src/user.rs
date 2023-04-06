@@ -123,6 +123,7 @@ pub async fn logout(identity: Option<Identity>) -> impl Responder {
 #[derive(Template)]
 #[template(path = "user/index.html")]
 struct IndexTemplate<'a> {
+    title: &'a str,
     user: &'a User,
     identity: &'a Option<User>,
     repositories: &'a [Repository],
@@ -160,7 +161,10 @@ async fn index(
             .collect(),
     };
 
+    let title = &username;
+
     Ok(IndexTemplate {
+        title,
         user: &user,
         identity: &identity,
         repositories: &repositories,

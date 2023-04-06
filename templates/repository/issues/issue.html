@@ -1,0 +1,139 @@
+{% include "shared/header.html" %}
+
+<style>
+    code {
+        background-color: #2d3137;
+        border-radius: 6px;
+        padding: 0 3px;
+    }
+
+    pre {
+        background-color: #1b1d20;
+        border-radius: 6px;
+        overflow: auto;
+        padding: 10px 0 10px 10px;
+    }
+
+    pre code {
+        padding: 0;
+        background-color: transparent;
+        border-radius: 0;
+        font-size: .84rem;
+    }
+
+    img {
+        max-width: 100%;
+        border-radius: 6px;
+    }
+
+    .open {
+        color: rgb(125, 219, 55);
+    }
+
+    .closed {
+        color: rgb(108, 108, 108);
+    }
+
+    textarea {
+        padding: 10px;
+        width: 100%;
+        max-width: 100%;
+        min-height: 150px;
+        box-sizing: border-box;
+        outline: none;
+        resize: vertical;
+        line-height: 1.5;
+        font-family: inherit;
+        font-size: .9rem;
+        color: #e7e7e8;
+        background-color: #0f0f0f;
+        border: 1px solid #2f2f2f;
+        border-radius: 5px;
+    }
+</style>
+
+<div style="position: relative; margin: 30px;">
+    <div style="font-size: 1.02rem; font-weight: 400;">
+        <a href="/@{{ username }}">@{{ username }}</a>/<a href="/@{{ username }}/{{ name }}">{{ name }}</a>
+    </div>
+
+    <div style="margin-top: 30px; max-width: 900px; font-size: 0.90rem;">
+        <div style="min-height: 20px;">
+            <div style="font-size: 0.90rem; font-weight: 400; margin-top: 10px; float: right;">
+                <a href="/@{{ username }}/{{ name }}/issues/new">new issue</a>
+            </div>
+        </div>
+
+        <div style="font-size: 1.5rem; width: inherit;">
+            <span>{{ issue.title }}</span> <span style="color: rgb(139, 144, 147);">#{{ issue.index }}</span>
+            {% if issue.status == 0 %}
+            (<span class="open">open</span>)
+            {% else %}
+            (<span class="closed">closed</span>)
+            {%endif %}
+        </div>
+
+        <div style="margin-top: 10px;">
+            <span>
+                <a href="/@{{ user.username }}" style="font-weight: 700;">@{{ user.username }}</a> <span
+                    style="color: rgb(139, 144, 147);">opened this issue {{ issue.created_at() }}</span>
+            </span>
+        </div>
+
+        <div style="width: inherit; margin-top: 10px;">
+            <p>{{ issue.body|safe }}</p>
+        </div>
+    </div>
+
+    {% if !comments.is_empty() %}
+    {% for comment in comments %}
+    {% let index = comment.index %}
+    <div id="comment-{{index}}"
+        style="max-width: 900px; font-size: 0.90rem; border-top: 1px dashed rgb(68, 76, 81); margin-top: 20px;">
+
+        <div style="margin-top: 20px;">
+            <span>
+                <a href="/@{{ comment.username }}" style="font-weight: 700;">@{{ comment.username }}</a> <span
+                    style="color: rgb(139, 144, 147);">commented {{ comment.created_at }}</span>
+            </span>
+            <span style="color: rgb(139, 144, 147) ; float: right; user-select: none;">
+                <a href="#comment-{{ index }}" style="color: rgb(139, 144, 147);">#{{ index }}</a>
+            </span>
+        </div>
+
+        <div style="width: inherit; margin-top: 10px;">
+            <p>{{ comment.body|safe }}</p>
+        </div>
+
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <div
+        style="max-width: 900px; font-size: 0.90rem; border-top: 1px dashed rgb(68, 76, 81); margin-top: 20px; margin-bottom: 100px;">
+        <div style="margin-top: 30px;">
+            {% if identity.is_some() && issue.status == 0 %}
+            <form action="{{ issue.index }}/add" method="post" style="width: 100%;">
+                <div>
+                    <div>
+                        <textarea name="body" spellcheck="false"></textarea>
+                    </div>
+                    <div style="float: right; margin-top: 5px;">
+                        <input type="submit" value="add comment"
+                            style="cursor: pointer; font-family: inherit; font-size: 0.90rem; width: auto; height: 28px;" />
+                    </div>
+                </div>
+            </form>
+            {% else if identity.is_some() && issue.status == 1 %}
+            Closed
+            {% else %}
+            <a href="/login">sign in</a> or <a href="/signup">sign up</a> to comment
+            {% endif %}
+        </div>
+
+    </div>
+
+
+</div>
+
+{% include "shared/footer.html" %}

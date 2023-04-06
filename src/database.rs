@@ -35,6 +35,12 @@ impl Database {
         result.unwrap_or(None)
     }
 
+    pub async fn find_user_from_id(&self, id: ObjectId) -> Option<User> {
+        let collection = self.inner.collection::<User>("users");
+        let result = collection.find_one(bson::doc! { "_id": id }, None).await;
+        result.unwrap_or(None)
+    }
+
     pub async fn find_user_repositories(&self, username: &str) -> Option<Vec<Repository>> {
         let Some(user) = self.find_user(username).await else {
             return None;
@@ -42,7 +48,7 @@ impl Database {
 
         let collection = self.inner.collection::<Repository>("repositories");
         let find_options = FindOptions::builder()
-            .projection(bson::doc! { "user_id": ObjectId::default(), "name": 1, "description": 1, "visibility": 1, "created_at": 1, "updated_at": 1 })
+            .projection(bson::doc! { "user_id": ObjectId::default(), "name": 1, "description": 1, "visibility": 1, "created_at": 1, "updated_at": 1, "issues": 1 })
             .build();
         let result = collection
             .find(bson::doc! { "user_id": user._id }, find_options)
@@ -60,7 +66,7 @@ impl Database {
         };
         let collection = self.inner.collection::<Repository>("repositories");
         let find_options = FindOneOptions::builder()
-            .projection(bson::doc! { "user_id": 1, "name": 1, "description": 1, "visibility": 1, "created_at": 1, "updated_at": 1 })
+            .projection(bson::doc! { "_id": 1, "user_id": 1, "name": 1, "description": 1, "visibility": 1, "created_at": 1, "updated_at": 1, "issues": 1 })
             .build();
         let result = collection.find_one(filter, find_options).await;
         result.unwrap_or(None)
@@ -91,12 +97,14 @@ impl Database {
         let now = time::OffsetDateTime::now_utc();
         let unix_timestamp = now.unix_timestamp();
         let repository = Repository {
+            _id: ObjectId::new(),
             user_id: user._id,
             name: name.to_owned(),
             description: description.unwrap_or_default(),
             visibility: visibility.to_owned(),
             created_at: unix_timestamp,
             updated_at: unix_timestamp,
+            issues: vec![],
         };
         if collection.insert_one(&repository, None).await.is_err() {
             todo!();

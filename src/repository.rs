@@ -52,6 +52,7 @@ struct Entry {
 #[derive(Template)]
 #[template(path = "repository.html")]
 struct RepositoryTemplate<'a> {
+    title: &'a str,
     repository: &'a model::Repository,
     username: &'a str,
     name: &'a str,
@@ -136,7 +137,10 @@ pub async fn index(
 
     entries.sort_by_key(|e| e.kind == Kind::File);
 
+    let title = &name;
+
     Ok(RepositoryTemplate {
+        title,
         repository: &repository,
         username: &username,
         name: &name,
@@ -153,6 +157,7 @@ pub async fn index(
 #[derive(Template)]
 #[template(path = "tree.html")]
 struct TreeTemplate<'a> {
+    title: &'a str,
     repository: &'a model::Repository,
     username: &'a str,
     user: &'a Option<User>,
@@ -169,6 +174,7 @@ struct TreeTemplate<'a> {
 #[derive(Template)]
 #[template(path = "file.html")]
 struct FileTemplate<'a> {
+    title: &'a str,
     repository: &'a model::Repository,
     username: &'a str,
     name: &'a str,
@@ -264,7 +270,10 @@ pub async fn tree(
 
     entries.sort_by_key(|e| e.kind == Kind::File);
 
+    let title = &format!("{name}/{branch}");
+
     Ok(TreeTemplate {
+        title,
         repository: &repository,
         username: &username,
         user: &user,
@@ -373,7 +382,10 @@ pub async fn tree_(
             breadcrumb.push_str(&url);
         }
 
+        let title = &format!("{name}/{branch}/{tail}");
+
         return Ok(FileTemplate {
+            title,
             repository: &repository,
             username: &username,
             name: &name,
@@ -457,7 +469,10 @@ pub async fn tree_(
         breadcrumb.push_str(&url);
     }
 
+    let title = &format!("{name}/{branch}");
+
     Ok(TreeTemplate {
+        title,
         repository: &repository,
         username: &username,
         user: &user,
@@ -476,6 +491,7 @@ pub async fn tree_(
 #[derive(Template)]
 #[template(path = "commits.html")]
 struct CommitsTemplate<'a> {
+    title: &'a str,
     user: &'a Option<User>,
     identity: &'a Option<User>,
     username: &'a str,
@@ -567,6 +583,7 @@ pub async fn commits(
     };
 
     Ok(CommitsTemplate {
+        title: "commits",
         name,
         username,
         user: &user,

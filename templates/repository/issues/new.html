@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title></title>
+    <link rel="stylesheet" href="/static/main.css">
+
+    <style>
+        textarea {
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            padding: 10px;
+            max-width: 100%;
+            line-height: 1.5;
+            border-radius: 5px;
+            outline: none;
+            font-family: inherit;
+            resize: vertical;
+        }
+    </style>
+</head>
+
+<body>
+    <div style="position: relative; margin: 30px;">
+        <form action="new" method="post">
+            <div>
+                <label>title</label>
+                <input type="text" name="title" spellcheck="false" autocomplete="off" required>
+            </div>
+            <div>
+                <label>body</label>
+                <textarea name="body" rows="10" cols="80" spellcheck="false"></textarea>
+            </div>
+            <div>
+                <input type="submit" value="new issue">
+            </div>
+        </form>
+    </div>
+</body>
+
+</html>
