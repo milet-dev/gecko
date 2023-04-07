@@ -1,14 +1,23 @@
 {% include "shared/header.html" %}
 
 <div style="position: relative; margin: 30px;">
-    <h2>
-        <a href="/@{{ username }}">@{{ username }}</a>
-    </h2>
-    <h4>{{ repository.name }}</h4>
-    <p>{{ repository.description }}</p>
+    <div>
+        <h2>
+            <a href="/@{{ username }}">@{{ username }}</a>
+        </h2>
+        <h4>{{ repository.name }}</h4>
+        <p>{{ repository.description }}</p>
+    </div>
 
-    <a href="/@{{ username }}/{{ name }}/commits">commits</a>
-    <a href="/@{{ username }}/{{ name }}/issues">issues</a>
+    <div style="margin-bottom: 15px;">
+        <a href="/@{{ username }}/{{ name }}/branches">branches</a>
+        <a href="/@{{ username }}/{{ name }}/commits">commits</a>
+        <a href="/@{{ username }}/{{ name }}/issues">issues</a>
+    </div>
+
+    <div>
+        branch: <a href="/@{{ username }}/{{name}}/tree/{{ branch }}">{{ branch }}</a>
+    </div>
 
     <div style="max-width: 800px;">
         <p>{{ commit.message }} (<a href="/@{{ username }}/{{ name }}/commit/{{ commit.id }}" style="color: #70c5bf;">{{

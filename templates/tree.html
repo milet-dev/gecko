@@ -3,14 +3,24 @@
 <div style="position: relative; margin: 30px;">
     <div>{{ breadcrumb|safe }}</div>
 
-    <h2>
-        <a href="/@{{ username }}">@{{ username }}</a>
-    </h2>
-    <h4><a href="/@{{ username }}/{{ repository.name }}/tree/{{ branch }}">{{ repository.name }}</a></h4>
-    <p>{{ repository.description }}</p>
+    <div>
+        <h2>
+            <a href="/@{{ username }}">@{{ username }}</a>
+        </h2>
+        <h4><a href="/@{{ username }}/{{ repository.name }}/tree/{{ branch }}">{{ repository.name }}</a></h4>
+        <p>{{ repository.description }}</p>
+    </div>
 
-    <a href="/@{{ username }}/{{ name }}/commits/{{ branch }}">commits</a>
-    <a href="/@{{ username }}/{{ name }}/issues">issues</a>
+    <div style="margin-bottom: 15px;">
+        <a href="/@{{ username }}/{{ name }}/branches">branches</a>
+        <a href="/@{{ username }}/{{ name }}/commits/{{ branch }}">commits</a>
+        <a href="/@{{ username }}/{{ name }}/issues">issues</a>
+    </div>
+
+    <div>
+        branch: <a href="/@{{ username }}/{{name}}/tree/{{ branch }}">{{ branch }}</a>
+    </div>
+
     <div style="max-width: 800px;">
         <p>{{ commit.message }} (<a href="/@{{ username }}/{{ name }}/commit/{{ commit.id }}" style="color: #70c5bf;">{{
                 commit.id[0..8] }}</a>)</p>
@@ -20,7 +30,8 @@
     <ul>
         {% for entry in entries %}
         <li>
-            <a href="/@{{ username }}/{{ name }}/tree/{{ branch }}/{{ tail }}/{{ entry.name }}">
+            <a
+                href="/@{{ username }}/{{ name }}/tree/{{ branch }}{% if !tail.is_empty() %}/{{ tail }}{% endif %}/{{ entry.name }}">
                 {{ entry.name }}{% if entry.kind.as_str() == "Tree" %}/{% else if entry.kind.as_str() == "Submodule"
                 %}*{% endif %}
             </a>

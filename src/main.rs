@@ -188,6 +188,7 @@ async fn main() -> std::io::Result<()> {
                     .service(repository::index)
                     .service(
                         web::scope("/{name}")
+                            .route("/branches", web::get().to(repository::branches))
                             .route("/commit/{id}", web::get().to(repository::diff))
                             .service(
                                 web::scope("/tree/{branch}")

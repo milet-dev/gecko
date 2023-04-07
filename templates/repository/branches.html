@@ -1,0 +1,12 @@
+{% include "shared/header.html" %}
+
+<div style="position: relative; margin: 30px;">
+    <h2>Branches</h2>
+    <ul style="list-style-type: decimal;">
+        {% for branch in branches %}
+        <li><a href="/@{{ username }}/{{ name }}/tree/{{ branch }}">{{ branch }}</a></li>
+        {% endfor %}
+    </ul>
+</div>
+
+{% include "shared/footer.html" %}

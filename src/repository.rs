@@ -54,9 +54,9 @@ struct Entry {
 struct RepositoryTemplate<'a> {
     title: &'a str,
     repository: &'a model::Repository,
+    branch: &'a str,
     username: &'a str,
     name: &'a str,
-    branch: &'a str,
     user: &'a Option<User>,
     identity: &'a Option<User>,
     entries: &'a [Entry],
@@ -89,7 +89,17 @@ pub async fn index(
     let Ok(repo) = git2::Repository::open(name.clone()) else {
         return Ok(HttpResponse::NotFound().finish());
     };
+
     let head = repo.head().unwrap();
+
+    let mut branch = String::new();
+    if head.is_branch() {
+        let name = head
+            .name()
+            .map(|name| name.split('/').last().unwrap())
+            .unwrap();
+        branch.push_str(name);
+    }
     let commit = head.peel_to_commit().unwrap();
 
     let message = commit.message().unwrap().to_string();
@@ -142,9 +152,9 @@ pub async fn index(
     Ok(RepositoryTemplate {
         title,
         repository: &repository,
+        branch: &branch,
         username: &username,
         name: &name,
-        branch: "main",
         user: &user,
         identity: &identity,
         entries: &entries,
@@ -486,6 +496,62 @@ pub async fn tree_(
         readme,
     }
     .to_response())
+}
+
+#[derive(Template)]
+#[template(path = "repository/branches.html")]
+struct BranchesTemplate<'a> {
+    title: &'a str,
+    user: &'a Option<User>,
+    identity: &'a Option<User>,
+    username: &'a str,
+    name: &'a str,
+    branches: &'a [String],
+}
+
+pub async fn branches(
+    path: web::Path<(String, String)>,
+    state: web::Data<State>,
+    identity: Option<Identity>,
+) -> impl Responder {
+    let (username, name) = path.into_inner();
+
+    let identity = match identity {
+        Some(identity) => match identity.id() {
+            Ok(id) => state.database.find_user(&id).await,
+            Err(_) => todo!(),
+        },
+        None => None,
+    };
+
+    let user = state.database.find_user(&username).await;
+
+    let Ok(repo) = git2::Repository::open(name.clone()) else {
+        todo!()
+    };
+
+    let branches = {
+        let mut vec = Vec::new();
+        let branches = repo.branches(Some(git2::BranchType::Local)).unwrap();
+        for branch in branches {
+            let (branch, _) = branch.unwrap();
+            let name = branch.name().unwrap().unwrap();
+            vec.push(name.to_owned());
+        }
+        vec
+    };
+
+    let title = format!("@{username}/{name}/branches");
+
+    BranchesTemplate {
+        title: &title,
+        identity: &identity,
+        user: &user,
+        username: &username,
+        name: &name,
+        branches: &branches,
+    }
+    .to_response()
 }
 
 #[derive(Template)]
