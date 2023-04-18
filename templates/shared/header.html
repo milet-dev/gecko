@@ -13,6 +13,7 @@
             {% when Some with (inner) %}
             <li><a href="/new">new</a></li>
             <li><a href="/@{{ inner.username }}">@{{ inner.username }}</a></li>
+            <li><a href="/settings/profile">settings</a></li>
             <li><a href="/logout">logout</a></li>
             {% when None %}
             <li><a href="/signup">sign up</a></li>

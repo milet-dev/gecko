@@ -1,0 +1,24 @@
+{% include "shared/header.html" %}
+<div style="position: relative; margin: 30px;">
+    <h1>Settings</h1>
+
+    <div style="height: 30px;">
+        <a href="password">update password</a>
+    </div>
+
+    <form method="post" action="update">
+        <div>
+            <label>username</label>
+            <input type="text" name="username" value="{{ user.username }}" spellcheck="false" autocomplete="off">
+
+        </div>
+        <div>
+            <label>email</label>
+            <input type="email" name="email" value="{{ user.email }}" spellcheck="false" autocomplete="off">
+        </div>
+        <div>
+            <input type="submit" value="update">
+        </div>
+    </form>
+</div>
+{% include "shared/footer.html" %}

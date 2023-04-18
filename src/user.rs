@@ -38,25 +38,16 @@ pub async fn signup(
         Method::POST => {
             let params = params.unwrap();
             let collection = state.db.collection::<User>("users");
-            let now = time::OffsetDateTime::now_utc();
-            let unix_timestamp = now.unix_timestamp();
 
-            let output: String = thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(40)
-                .map(char::from)
-                .collect();
-            let salt = blake3::hash(format!("{output}{}", unix_timestamp).as_bytes()).to_string();
-            let password =
-                blake3::hash(format!("{}{}", params.password, salt).as_bytes()).to_string();
+            let (password, salt) = create_password(&params.password);
             let user = User {
                 _id: bson::oid::ObjectId::default(),
                 email: params.email.clone(),
                 username: params.username.clone(),
                 password,
                 salt,
-                created_at: unix_timestamp,
-                updated_at: unix_timestamp,
+                created_at: unix_timestamp(),
+                updated_at: unix_timestamp(),
             };
             if collection.insert_one(&user, None).await.is_err() {
                 todo!();
@@ -95,7 +86,11 @@ pub async fn login(
     match *req.method() {
         Method::GET => LoginTemplate { title: "login" }.to_response(),
         Method::POST => {
-            let params = params.unwrap();
+            let Some(params) = params else {
+                return HttpResponse::SeeOther()
+                    .insert_header(("Location", "/login"))
+                    .finish()
+            };
             let username = params.username.clone();
             let password = params.password.clone();
             let Some(user) = state.database.login(&username, &password).await else {
@@ -236,4 +231,192 @@ pub async fn new(
         }
         _ => unimplemented!(),
     }
+}
+
+#[derive(Template)]
+#[template(path = "settings.html")]
+struct SettingsTemplate<'a> {
+    title: &'a str,
+    user: &'a User,
+    identity: Option<User>,
+}
+
+pub async fn settings(state: web::Data<State>, identity: Option<Identity>) -> impl Responder {
+    let identity = match identity.as_ref() {
+        Some(identity) => match identity.id() {
+            Ok(id) => state.database.find_user(&id).await,
+            Err(_) => unimplemented!(),
+        },
+        None => None,
+    };
+
+    let Some(user) = identity.clone() else {
+        return HttpResponse::SeeOther()
+            .insert_header(("Location", "/login"))
+            .finish();
+    };
+
+    SettingsTemplate {
+        title: "settings",
+        user: &user,
+        identity,
+    }
+    .to_response()
+}
+
+#[derive(Template)]
+#[template(path = "password.html")]
+struct PasswordTemplate<'a> {
+    title: &'a str,
+    identity: Option<User>,
+}
+
+pub async fn password(state: web::Data<State>, identity: Option<Identity>) -> impl Responder {
+    let identity = match identity {
+        Some(identity) => match identity.id() {
+            Ok(id) => state.database.find_user(&id).await,
+            Err(_) => unimplemented!(),
+        },
+        None => {
+            return HttpResponse::TemporaryRedirect()
+                .insert_header(("Location", "/login"))
+                .finish()
+        }
+    };
+
+    PasswordTemplate {
+        title: "update password",
+        identity,
+    }
+    .to_response()
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UpdateForm {
+    email: String,
+    username: String,
+}
+
+pub async fn update(
+    state: web::Data<State>,
+    identity: Option<Identity>,
+    form: web::Form<UpdateForm>,
+) -> impl Responder {
+    let Some(identity) = identity else {
+        return web::Redirect::to("/login");
+    };
+
+    let id = identity.id().unwrap();
+    let form = form.into_inner();
+    let username = form.username;
+
+    let users = state.db.collection::<User>("users");
+    let result = users
+        .update_one(
+            bson::doc! { "username": &id },
+            bson::doc! {
+                "$set": {
+                    "email": &form.email,
+                    "username": &username,
+                    "updated_at": unix_timestamp(),
+                },
+            },
+            None,
+        )
+        .await;
+    match result {
+        Ok(update_result) if update_result.modified_count != 0 => {
+            identity.logout();
+            web::Redirect::to("/login")
+        }
+        _ => web::Redirect::to("/login"),
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UpdatePasswordForm {
+    password0: String,
+    password1: String,
+    password2: String,
+}
+
+pub async fn update_password(
+    state: web::Data<State>,
+    identity: Option<Identity>,
+    form: web::Form<UpdatePasswordForm>,
+) -> impl Responder {
+    let Some(identity) = identity else {
+        return HttpResponse::SeeOther()
+            .insert_header(("Location", "/login"))
+            .finish();
+    };
+
+    let id = identity.id().unwrap();
+    let form = form.into_inner();
+
+    let users = state.db.collection::<User>("users");
+    let user: User = users
+        .find_one(bson::doc! { "username": &id }, None)
+        .await
+        .unwrap()
+        .unwrap();
+
+    let password0 = create_password_using_salt(&form.password0, &user.salt);
+    if password0 != user.password {
+        return HttpResponse::SeeOther()
+            .insert_header(("Location", "/settings/password"))
+            .finish();
+    }
+    let (password1, salt) = create_password(&form.password1);
+    let password2 = create_password_using_salt(&form.password2, &salt);
+    if password1 != password2 {
+        return HttpResponse::SeeOther()
+            .insert_header(("Location", "/settings/password"))
+            .finish();
+    }
+
+    let result = users
+        .update_one(
+            bson::doc! { "username": &id },
+            bson::doc! {
+                "$set": {
+                    "password": password1,
+                    "salt": salt,
+                    "updated_at": unix_timestamp(),
+                },
+            },
+            None,
+        )
+        .await;
+    match result {
+        Ok(update_result) if update_result.modified_count != 0 => {
+            identity.logout();
+            HttpResponse::SeeOther()
+                .insert_header(("Location", "/login"))
+                .finish()
+        }
+        _ => HttpResponse::SeeOther()
+            .insert_header(("Location", "/login"))
+            .finish(),
+    }
+}
+
+pub fn unix_timestamp() -> i64 {
+    let now = time::OffsetDateTime::now_utc();
+    now.unix_timestamp()
+}
+
+fn create_password_using_salt(password: &str, salt: &str) -> String {
+    blake3::hash(format!("{}{}", password, salt).as_bytes()).to_string()
+}
+
+fn create_password(password: &str) -> (String, String) {
+    let random_values: String = thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(40)
+        .map(char::from)
+        .collect();
+    let salt = blake3::hash(format!("{random_values}{}", unix_timestamp()).as_bytes()).to_string();
+    let password = blake3::hash(format!("{password}{salt}").as_bytes()).to_string();
+    (password, salt)
 }

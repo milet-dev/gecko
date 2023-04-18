@@ -184,6 +184,13 @@ async fn main() -> std::io::Result<()> {
             .service(index)
             .service(repository::delete)
             .service(
+                web::scope("/settings")
+                    .default_service(web::get().to(user::settings))
+                    .route("/update", web::post().to(user::update))
+                    .route("/password", web::get().to(user::password))
+                    .route("/update_password", web::post().to(user::update_password)),
+            )
+            .service(
                 web::scope("/@{username}")
                     .service(repository::index)
                     .service(
