@@ -105,6 +105,29 @@
             color: rgb(139, 144, 147);
         }
 
+        .status {
+            float: left;
+            width: 5px;
+            height: 21px;
+            border-radius: 2px;
+        }
+
+        .status.added {
+            background-color: rgb(125, 219, 55);
+        }
+
+        .status.modified {
+            background-color: rgb(255, 163, 74);
+        }
+
+        .status.deleted {
+            background-color: rgb(251, 74, 74);
+        }
+
+        .status.none {
+            background-color: rgb(139, 144, 147);
+        }
+
         .information {
             right: 10px;
             font-size: .8rem !important;
@@ -134,7 +157,7 @@
     <div style="margin: 10px;">
         <span>{{ commit.author.name }} - {{ commit.author.email }}</span>
     </div>
-    <div style="font-size: .9rem; width: 100%; height: 60px;">
+    <div style="font-size: .9rem; width: 100%; min-height: 60px;">
         <div class="stats">
             <span style="font-weight: 700;">{{ diff.stats.files_changed() }}</span> files changed,
             <span class="insertions" style="font-weight: 700;">{{ diff.stats.insertions() }}</span> insertions(+),
@@ -155,8 +178,39 @@
                 }}</span>
         </div>
     </div>
-    {% for file in diff.files %}
 
+    <div
+        style="margin: 10px; margin-bottom: 50px; min-width: 150px; min-height: 80px; border: 1px solid rgb(63, 68, 70); border-radius: 4px;">
+        <div style="margin: 10px;">
+            <div style="font-size: 1rem; font-weight: 600; margin-bottom: 10px;">
+                file tree
+            </div>
+            {% for file in diff.tree %}
+
+            {% let status -%}
+            {% if file.status == "added" -%}
+            {% let status = "added" -%}
+            {% else if file.status == "modified" -%}
+            {% let status = "modified" -%}
+            {% else if file.status == "deleted" -%}
+            {% let status = "deleted" -%}
+            {% else -%}
+            {% let status = "none" -%}
+            {% endif -%}
+
+            <div style="margin-bottom: 5px;">
+                <div style="width: 300px; min-height: 20px;">
+                    <div title="{{ status }}" class="status {{ status }}"></div>
+                    <div style="float: left; margin-top: -1px;">
+                        <a style="margin-left: 8px;" href="#diff-{{ file.hash }}">{{ file.path }}</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% for file in diff.files %}
     {% let hash = file.hash.as_str() %}
 
     <div id="diff-{{ hash }}" style="margin-top: 15px; background-color: #272a2f; height: 35px;">

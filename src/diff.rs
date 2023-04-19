@@ -52,6 +52,14 @@ impl From<(String, (Stats, String, Vec<Line>))> for File {
 pub struct Diff {
     pub files: Vec<File>,
     pub stats: git2::DiffStats,
+    pub tree: Vec<Entry>,
+}
+
+#[derive(Debug)]
+pub struct Entry {
+    pub path: String,
+    pub hash: String,
+    pub status: String,
 }
 
 impl Diff {
@@ -64,6 +72,28 @@ impl Diff {
         let diff = repo
             .diff_tree_to_tree(parent_tree.as_ref(), Some(&commit_tree), Some(&mut opts))
             .unwrap();
+
+        let tree: Vec<_> = diff
+            .deltas()
+            .map(|diff_delta| {
+                let path = diff_delta
+                    .new_file()
+                    .path()
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned();
+                let mut hasher = Sha256::new();
+                hasher.update(path.as_bytes());
+                let hash = format!("{:x}", hasher.finalize());
+                let status = match diff_delta.status() {
+                    git2::Delta::Added => "added".to_owned(),
+                    git2::Delta::Modified => "modified".to_owned(),
+                    git2::Delta::Deleted => "deleted".to_owned(),
+                    _ => unimplemented!(),
+                };
+                Entry { path, hash, status }
+            })
+            .collect();
 
         let stats = diff.stats().unwrap();
 
@@ -118,6 +148,6 @@ impl Diff {
         let mut files: Vec<_> = map.into_iter().map(File::from).collect();
         files.sort_unstable_by_key(|inner| inner.name.clone());
 
-        Self { files, stats }
+        Self { files, stats, tree }
     }
 }
