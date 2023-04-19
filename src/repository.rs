@@ -193,7 +193,7 @@ struct FileTemplate<'a> {
     user: &'a Option<User>,
     identity: &'a Option<User>,
     blob_name: &'a str,
-    content: &'a str,
+    content: &'a [&'a str],
     size: &'a str,
 }
 
@@ -360,19 +360,7 @@ pub async fn tree_(
                 .body(format!("{blob_name} {size}\n<a href=\"/@{username}/{name}/tree/{branch}/{tail}/?raw=true\">view raw</a>")));
         }
 
-        let content = if blob_name.ends_with(".md") || blob_name.ends_with(".markdown") {
-            markdown::to_html_with_options(&content, &markdown::Options::gfm()).unwrap()
-        } else {
-            let mut buffer = String::new();
-            buffer.push_str("<pre>");
-            for (mut i, line) in content.lines().enumerate() {
-                i += 1;
-                let url = format!("<a class=\"line\" id=\"L{i}\" href=\"/@{username}/{name}/tree/{branch}/{tail}#L{i}\">{i}</a>\t{line}\n");
-                buffer.push_str(&url);
-            }
-            buffer.push_str("</pre>");
-            buffer
-        };
+        let content: Vec<&str> = content.lines().collect();
 
         let mut breadcrumb = String::new();
         let mut buffer = String::new();
@@ -404,7 +392,7 @@ pub async fn tree_(
             user: &user,
             identity: &identity,
             blob_name,
-            content: &content,
+            content: content.as_slice(),
             size: &size,
         }
         .to_response());

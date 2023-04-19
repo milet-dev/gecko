@@ -55,13 +55,3 @@ select {
     font-size: 0.9rem;
     padding: 2px 5px;
 }
-
-.line {
-    color: #63a29e;
-    text-decoration: none;
-}
-
-.line:hover {
-    color: #70c5bf;
-    text-decoration: underline;
-}

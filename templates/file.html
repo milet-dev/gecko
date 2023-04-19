@@ -1,12 +1,61 @@
 {% include "shared/header.html" %}
 
+<style>
+    ::selection {
+        background-color: rgb(63, 68, 70);
+        color: rgb(120, 123, 125);
+    }
+
+    pre {
+        font-family: 'Cascadia Code';
+        font-size: 0.8rem;
+        font-weight: 400;
+        line-height: 0.9;
+    }
+
+    .lines {
+        display: flex;
+        width: 100%;
+        height: auto;
+        flex-direction: column;
+        row-gap: 0;
+    }
+
+    .lines .line {
+        height: 20px;
+        width: auto;
+    }
+
+    .lines .line .text {
+        margin-top: -9px;
+    }
+
+    .line-number {
+        float: left;
+        width: 50px;
+        height: 20px !important;
+        font-size: 0.8rem;
+        user-select: none;
+        color: #b5b5bb;
+    }
+</style>
 <div style="position: relative; margin: 30px;">
     <div>{{ breadcrumb|safe }}</div>
 
-    <p>{{ content.lines().count() - 1 }} lines - {{ size }}</p>
+    <p>{{ content.len() }} lines - {{ size }}</p>
     <div style="max-width: 1050px;">
         <div style="font-size: 0.84rem;">
-            {{ content|safe }}
+
+            <div class="lines" style="margin-top: 3px;">
+                {% for line in content %}
+                <div class="line" id="L{{ loop.index }}">
+                    <span class="line-number">
+                        <a href="#L{{ loop.index }}">{{ loop.index }}</a>
+                    </span>
+                    <pre><div class="text">{{ line }}</div></pre>
+                </div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 </div>
