@@ -11,9 +11,9 @@ pub struct Database {
 }
 
 impl Database {
-    pub fn new(client: &mongodb::Client) -> Self {
+    pub fn new(client: &mongodb::Client, name: &str) -> Self {
         Self {
-            inner: client.database("gecko"),
+            inner: client.database(name),
         }
     }
 

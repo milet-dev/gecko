@@ -144,7 +144,7 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap();
 
-    let database = Database::new(&client);
+    let database = Database::new(&client, DATABASE_NAME);
     let state = State {
         db: client.database(DATABASE_NAME),
         database,
