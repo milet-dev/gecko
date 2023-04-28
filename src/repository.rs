@@ -50,7 +50,7 @@ struct Entry {
 }
 
 #[derive(Template)]
-#[template(path = "repository.html")]
+#[template(path = "repository/index.html")]
 struct RepositoryTemplate<'a> {
     title: &'a str,
     repository: &'a model::Repository,
@@ -74,7 +74,7 @@ pub async fn index(
 
     let identity = match identity {
         Some(identity) => match identity.id() {
-            Ok(id) => state.database.find_user(&id).await,
+            Ok(id) => state.database.find_user_from_id(&id).await,
             Err(_) => todo!(),
         },
         None => None,
@@ -206,7 +206,7 @@ pub async fn tree(
 
     let identity = match identity {
         Some(identity) => match identity.id() {
-            Ok(id) => state.database.find_user(&id).await,
+            Ok(id) => state.database.find_user_from_id(&id).await,
             Err(_) => todo!(),
         },
         None => None,
@@ -314,7 +314,7 @@ pub async fn tree_(
 
     let identity = match identity {
         Some(identity) => match identity.id() {
-            Ok(id) => state.database.find_user(&id).await,
+            Ok(id) => state.database.find_user_from_id(&id).await,
             Err(_) => todo!(),
         },
         None => None,
@@ -506,7 +506,7 @@ pub async fn branches(
 
     let identity = match identity {
         Some(identity) => match identity.id() {
-            Ok(id) => state.database.find_user(&id).await,
+            Ok(id) => state.database.find_user_from_id(&id).await,
             Err(_) => todo!(),
         },
         None => None,
@@ -575,7 +575,7 @@ pub async fn commits(
 
     let identity = match identity {
         Some(identity) => match identity.id() {
-            Ok(id) => state.database.find_user(&id).await,
+            Ok(id) => state.database.find_user_from_id(&id).await,
             Err(_) => todo!(),
         },
         None => None,
@@ -744,7 +744,7 @@ pub async fn delete(
 
     let identity = match identity {
         Some(identity) => match identity.id() {
-            Ok(id) => state.database.find_user(&id).await,
+            Ok(id) => state.database.find_user_from_id(&id).await,
             Err(_) => todo!(),
         },
         None => None,

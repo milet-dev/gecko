@@ -44,7 +44,7 @@ pub struct Repository {
     pub issues: Vec<Issue>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub _id: ObjectId,
     pub email: String,

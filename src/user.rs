@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::{
     model::{Repository, User},
     State,
@@ -6,6 +8,7 @@ use actix_identity::Identity;
 use actix_web::{get, http::Method, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use askama::Template;
 use askama_actix::TemplateToResponse;
+use bson::oid::ObjectId;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 
@@ -98,7 +101,11 @@ pub async fn login(
                     .insert_header(("Location", "/login"))
                     .finish();
             };
-            Identity::login(&req.extensions(), user.username).unwrap();
+            if Identity::login(&req.extensions(), user._id.to_string()).is_err() {
+                return HttpResponse::SeeOther()
+                    .insert_header(("Location", "/login"))
+                    .finish();
+            }
             HttpResponse::SeeOther()
                 .insert_header(("Location", "/login"))
                 .finish()
@@ -134,7 +141,7 @@ async fn index(
 
     let identity = match identity {
         Some(identity) => match identity.id() {
-            Ok(id) => state.database.find_user(&id).await,
+            Ok(id) => state.database.find_user_from_id(&id).await,
             Err(_) => todo!(),
         },
         None => None,
@@ -144,7 +151,7 @@ async fn index(
         return Ok(HttpResponse::NotFound().finish());
     };
 
-    let Some(repositories) = state.database.find_user_repositories(&username).await else {
+    let Some(repositories) = state.database.find_user_repositories(user._id).await else {
         return Ok(HttpResponse::NotFound().finish());
     };
 
@@ -192,9 +199,9 @@ pub async fn new(
             .finish();
     };
 
-    let username = identity.id().unwrap();
+    let id = identity.id().unwrap();
 
-    if state.database.find_user(&username).await.is_none() {
+    if state.database.find_user_from_id(&id).await.is_none() {
         return HttpResponse::SeeOther()
             .insert_header(("Location", "/"))
             .finish();
@@ -205,9 +212,9 @@ pub async fn new(
         Method::POST => {
             let form = form.unwrap();
 
-            let username = identity.id().unwrap();
-
-            let user = state.database.find_user(&username).await;
+            let id = identity.id().unwrap();
+            let user = state.database.find_user_from_id(&id).await.unwrap();
+            let username = &user.username;
 
             let repository_name = form.name.clone();
             let description = if !form.description.is_empty() {
@@ -217,7 +224,7 @@ pub async fn new(
             };
             let result = state
                 .database
-                .new_repository(&user, &repository_name, description, &form.visibility)
+                .new_repository(Some(&user), &repository_name, description, &form.visibility)
                 .await;
             if result.eq(&Err(crate::database::Error::Found)) {
                 return HttpResponse::SeeOther()
@@ -229,7 +236,7 @@ pub async fn new(
                 .insert_header(("Location", format!("/@{username}/{}", form.name)))
                 .finish()
         }
-        _ => unimplemented!(),
+        _ => HttpResponse::NotFound().finish(),
     }
 }
 
@@ -244,7 +251,7 @@ struct SettingsTemplate<'a> {
 pub async fn settings(state: web::Data<State>, identity: Option<Identity>) -> impl Responder {
     let identity = match identity.as_ref() {
         Some(identity) => match identity.id() {
-            Ok(id) => state.database.find_user(&id).await,
+            Ok(id) => state.database.find_user_from_id(&id).await,
             Err(_) => unimplemented!(),
         },
         None => None,
@@ -274,7 +281,7 @@ struct PasswordTemplate<'a> {
 pub async fn password(state: web::Data<State>, identity: Option<Identity>) -> impl Responder {
     let identity = match identity {
         Some(identity) => match identity.id() {
-            Ok(id) => state.database.find_user(&id).await,
+            Ok(id) => state.database.find_user_from_id(&id).await,
             Err(_) => unimplemented!(),
         },
         None => {
@@ -303,7 +310,9 @@ pub async fn update(
     form: web::Form<UpdateForm>,
 ) -> impl Responder {
     let Some(identity) = identity else {
-        return web::Redirect::to("/login");
+        return HttpResponse::SeeOther()
+            .insert_header(("Location", "/login"))
+            .finish();
     };
 
     let id = identity.id().unwrap();
@@ -313,7 +322,7 @@ pub async fn update(
     let users = state.db.collection::<User>("users");
     let result = users
         .update_one(
-            bson::doc! { "username": &id },
+            bson::doc! { "_id": ObjectId::from_str(&id).unwrap() },
             bson::doc! {
                 "$set": {
                     "email": &form.email,
@@ -325,11 +334,15 @@ pub async fn update(
         )
         .await;
     match result {
-        Ok(update_result) if update_result.modified_count != 0 => {
+        Ok(update_result) if update_result.modified_count != 0 => HttpResponse::SeeOther()
+            .insert_header(("Location", format!("/@{username}")))
+            .finish(),
+        _ => {
             identity.logout();
-            web::Redirect::to("/login")
+            HttpResponse::SeeOther()
+                .insert_header(("Location", "/login"))
+                .finish()
         }
-        _ => web::Redirect::to("/login"),
     }
 }
 
@@ -351,15 +364,15 @@ pub async fn update_password(
             .finish();
     };
 
-    let id = identity.id().unwrap();
+    let user = match identity.id() {
+        Ok(id) => state.database.find_user_from_id(&id).await.unwrap(),
+        Err(_) => {
+            return HttpResponse::SeeOther()
+                .insert_header(("Location", "/login"))
+                .finish()
+        }
+    };
     let form = form.into_inner();
-
-    let users = state.db.collection::<User>("users");
-    let user: User = users
-        .find_one(bson::doc! { "username": &id }, None)
-        .await
-        .unwrap()
-        .unwrap();
 
     let password0 = create_password_using_salt(&form.password0, &user.salt);
     if password0 != user.password {
@@ -375,9 +388,10 @@ pub async fn update_password(
             .finish();
     }
 
+    let users = state.db.collection::<User>("users");
     let result = users
         .update_one(
-            bson::doc! { "username": &id },
+            bson::doc! { "_id": user._id },
             bson::doc! {
                 "$set": {
                     "password": password1,
@@ -389,12 +403,9 @@ pub async fn update_password(
         )
         .await;
     match result {
-        Ok(update_result) if update_result.modified_count != 0 => {
-            identity.logout();
-            HttpResponse::SeeOther()
-                .insert_header(("Location", "/login"))
-                .finish()
-        }
+        Ok(update_result) if update_result.modified_count != 0 => HttpResponse::SeeOther()
+            .insert_header(("Location", "/settings/password"))
+            .finish(),
         _ => HttpResponse::SeeOther()
             .insert_header(("Location", "/login"))
             .finish(),

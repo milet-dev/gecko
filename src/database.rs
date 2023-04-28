@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::model::{Repository, User};
 use bson::oid::ObjectId;
 use futures::TryStreamExt;
@@ -35,14 +37,15 @@ impl Database {
         result.unwrap_or(None)
     }
 
-    pub async fn find_user_from_id(&self, id: ObjectId) -> Option<User> {
+    pub async fn find_user_from_id(&self, id: &str) -> Option<User> {
+        let _id = ObjectId::from_str(id).unwrap();
         let collection = self.inner.collection::<User>("users");
-        let result = collection.find_one(bson::doc! { "_id": id }, None).await;
+        let result = collection.find_one(bson::doc! { "_id": _id }, None).await;
         result.unwrap_or(None)
     }
 
-    pub async fn find_user_repositories(&self, username: &str) -> Option<Vec<Repository>> {
-        let Some(user) = self.find_user(username).await else {
+    pub async fn find_user_repositories(&self, id: ObjectId) -> Option<Vec<Repository>> {
+        let Some(user) = self.find_user_from_id(&id.to_string()).await else {
             return None;
         };
 
@@ -74,7 +77,7 @@ impl Database {
 
     pub async fn new_repository(
         &self,
-        user: &Option<User>,
+        user: Option<&User>,
         name: &str,
         description: Option<String>,
         visibility: &str,

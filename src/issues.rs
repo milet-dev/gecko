@@ -29,12 +29,17 @@ pub async fn index(
 
     let identity = match identity {
         Some(identity) => match identity.id() {
-            Ok(id) => state.database.find_user(&id).await,
+            Ok(id) => state.database.find_user_from_id(&id).await,
             Err(_) => todo!(),
         },
         None => None,
     };
-    let repo = state.database.find_repository(None, &name).await.unwrap();
+    let user = state.database.find_user(&username).await;
+    let repo = state
+        .database
+        .find_repository(user.as_ref(), &name)
+        .await
+        .unwrap();
     Issues {
         title: "issues",
         identity: &identity,
@@ -73,12 +78,17 @@ pub async fn view(
 
     let identity = match identity {
         Some(identity) => match identity.id() {
-            Ok(id) => state.database.find_user(&id).await,
+            Ok(id) => state.database.find_user_from_id(&id).await,
             Err(_) => todo!(),
         },
         None => None,
     };
-    let mut repo = state.database.find_repository(None, &name).await.unwrap();
+    let user = state.database.find_user(&username).await;
+    let mut repo = state
+        .database
+        .find_repository(user.as_ref(), &name)
+        .await
+        .unwrap();
     let Some(mut issue) = repo.issues.iter_mut().find(|issue| issue.index == index) else {
         todo!()
     };
@@ -86,9 +96,9 @@ pub async fn view(
     for comment in &issue.comments {
         let user = state
             .database
-            .find_user_from_id(comment.user_id)
+            .find_user_from_id(&comment.user_id.to_string())
             .await
-            .unwrap();
+            .unwrap_or_default();
         let body = markdown::to_html_with_options(&comment.body, &markdown::Options::gfm())
             .unwrap()
             .to_string();
@@ -108,7 +118,7 @@ pub async fn view(
 
     let user = state
         .database
-        .find_user_from_id(issue.user_id)
+        .find_user_from_id(&issue.user_id.to_string())
         .await
         .unwrap();
 
@@ -141,7 +151,7 @@ pub async fn add_comment(
 
     let identity = match identity {
         Some(identity) => match identity.id() {
-            Ok(id) => state.database.find_user(&id).await,
+            Ok(id) => state.database.find_user_from_id(&id).await,
             Err(_) => todo!(),
         },
         None => {
@@ -157,7 +167,13 @@ pub async fn add_comment(
             .finish();
     }
 
-    let repo = state.database.find_repository(None, &name).await.unwrap();
+    let user = state.database.find_user(&username).await;
+
+    let repo = state
+        .database
+        .find_repository(user.as_ref(), &name)
+        .await
+        .unwrap();
     let Some(issue) = repo.issues.iter().find(|issue| issue.index == issue_id) else {
         todo!()
     };
@@ -224,19 +240,20 @@ pub async fn new(
 
     let identity = match identity {
         Some(identity) => match identity.id() {
-            Ok(id) => state.database.find_user(&id).await,
+            Ok(id) => state.database.find_user_from_id(&id).await,
             Err(_) => todo!(),
         },
         None => None,
     };
 
-    let Some(user) = identity.as_ref() else {
-        return HttpResponse::SeeOther()
-            .insert_header(("Location", "/login"))
-            .finish();
+    let repo = {
+        let user = state.database.find_user(&username).await;
+        state
+            .database
+            .find_repository(user.as_ref(), &name)
+            .await
+            .unwrap()
     };
-
-    let repo = state.database.find_repository(None, &name).await.unwrap();
 
     match *req.method() {
         Method::GET => NewIssue {
@@ -246,6 +263,12 @@ pub async fn new(
         }
         .to_response(),
         Method::POST => {
+            let Some(user) = identity.as_ref() else {
+                return HttpResponse::SeeOther()
+                    .insert_header(("Location", "/login"))
+                    .finish();
+            };
+
             let form = form.unwrap();
 
             let repositories = state.db.collection::<Repository>("repositories");

@@ -48,7 +48,7 @@ struct IndexTemplate<'a> {
 async fn index(state: web::Data<State>, identity: Option<Identity>) -> Result<impl Responder> {
     let identity = match identity {
         Some(identity) => match identity.id() {
-            Ok(id) => state.database.find_user(&id).await,
+            Ok(id) => state.database.find_user_from_id(&id).await,
             Err(_) => todo!(),
         },
         None => None,
@@ -85,9 +85,8 @@ async fn index(state: web::Data<State>, identity: Option<Identity>) -> Result<im
     let mut cursor = output.unwrap();
     let mut users: Vec<User_> = Vec::new();
     while let Some(document) = cursor.try_next().await.unwrap() {
-        let username = document.get_str("username").unwrap().to_owned();
-
-        let user = state.database.find_user(&username).await.unwrap();
+        let username = document.get_str("username").unwrap();
+        let user = state.database.find_user(username).await.unwrap();
 
         let Ok(repositories) = document.get_array("repositories") else {
             continue;
@@ -124,7 +123,7 @@ async fn index(state: web::Data<State>, identity: Option<Identity>) -> Result<im
         };
 
         users.push(User_ {
-            username,
+            username: username.to_owned(),
             repositories,
         });
     }
