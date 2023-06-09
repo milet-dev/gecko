@@ -53,4 +53,25 @@ pub struct User {
     pub salt: String,
     pub created_at: i64,
     pub updated_at: i64,
+    pub log: Vec<Log>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Event {
+    RepositoryCreate,
+}
+
+impl Event {
+    pub fn to_string(&self) -> String {
+        match self {
+            Event::RepositoryCreate => String::from("repository.create"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Log {
+    pub event: String,
+    pub description: String,
+    pub created_at: i64,
 }

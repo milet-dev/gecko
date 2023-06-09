@@ -1,0 +1,20 @@
+{% include "shared/header.html" %}
+
+<div style="position: relative; margin: 30px;">
+    <h4>Log:</h4>
+    <ul>
+        {% for entry in log %}
+        <li>
+            <div>
+                <div>
+                    <a href="">{{ entry.event }}</a>
+                </div>
+                <div>{{ entry.description }}</div>
+                <div>{{ entry.created_at }}</div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+
+{% include "shared/footer.html" %}

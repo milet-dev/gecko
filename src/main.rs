@@ -187,7 +187,8 @@ async fn main() -> std::io::Result<()> {
                     .default_service(web::get().to(user::settings))
                     .route("/update", web::post().to(user::update))
                     .route("/password", web::get().to(user::password))
-                    .route("/update_password", web::post().to(user::update_password)),
+                    .route("/update_password", web::post().to(user::update_password))
+                    .route("/log", web::get().to(user::log)),
             )
             .service(
                 web::scope("/@{username}")
@@ -224,7 +225,7 @@ async fn main() -> std::io::Result<()> {
                     ),
             )
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("127.0.0.1", 9090))?
     .run()
     .await
 }

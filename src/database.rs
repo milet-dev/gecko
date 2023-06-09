@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::model::{Repository, User};
+use crate::model::{Event, Log, Repository, User};
 use bson::oid::ObjectId;
 use futures::TryStreamExt;
 use mongodb::options::{FindOneOptions, FindOptions};
@@ -38,9 +38,10 @@ impl Database {
     }
 
     pub async fn find_user_from_id(&self, id: &str) -> Option<User> {
-        let _id = ObjectId::from_str(id).unwrap();
         let collection = self.inner.collection::<User>("users");
-        let result = collection.find_one(bson::doc! { "_id": _id }, None).await;
+        let result = collection
+            .find_one(bson::doc! { "_id": ObjectId::from_str(&id).unwrap() }, None)
+            .await;
         result.unwrap_or(None)
     }
 
@@ -133,6 +134,33 @@ impl Database {
             return Err(Error::NotFound);
         }
         Ok(())
+    }
+
+    pub async fn add_user_log(&self, user: &User, event: Event, description: Option<String>) {
+        let now = time::OffsetDateTime::now_utc();
+        let unix_timestamp = now.unix_timestamp();
+        let log = Log {
+            event: event.to_string(),
+            description: description.unwrap_or("undefined".to_owned()),
+            created_at: unix_timestamp,
+        };
+        let users = self.inner.collection::<User>("users");
+        let result = users
+            .update_one(
+                bson::doc! {"_id": user._id},
+                bson::doc! {
+                    "$push": {
+                        "log": {
+                            "event": log.event,
+                            "description": log.description,
+                            "created_at": log.created_at,
+                        }
+                    }
+                },
+                None,
+            )
+            .await;
+        debug_assert!(result.is_ok());
     }
 }
 

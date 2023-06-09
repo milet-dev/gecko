@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::{
-    model::{Repository, User},
+    model::{Event, Log, Repository, User},
     State,
 };
 use actix_identity::Identity;
@@ -51,6 +51,7 @@ pub async fn signup(
                 salt,
                 created_at: unix_timestamp(),
                 updated_at: unix_timestamp(),
+                log: Vec::new(),
             };
             if collection.insert_one(&user, None).await.is_err() {
                 todo!();
@@ -232,6 +233,13 @@ pub async fn new(
                     .finish();
             }
 
+            if result.is_ok() {
+                state
+                    .database
+                    .add_user_log(&user, Event::RepositoryCreate, Some(repository_name))
+                    .await;
+            }
+
             HttpResponse::SeeOther()
                 .insert_header(("Location", format!("/@{username}/{}", form.name)))
                 .finish()
@@ -267,6 +275,40 @@ pub async fn settings(state: web::Data<State>, identity: Option<Identity>) -> im
         title: "settings",
         user: &user,
         identity,
+    }
+    .to_response()
+}
+
+#[derive(Template)]
+#[template(path = "user/log.html")]
+struct LogTemplate<'a> {
+    title: &'a str,
+    identity: Option<User>,
+    log: &'a [Log],
+}
+
+pub async fn log(state: web::Data<State>, identity: Option<Identity>) -> impl Responder {
+    let identity = match identity {
+        Some(identity) => match identity.id() {
+            Ok(id) => state.database.find_user_from_id(&id).await,
+            Err(_) => unimplemented!(),
+        },
+        None => {
+            return HttpResponse::TemporaryRedirect()
+                .insert_header(("Location", "/login"))
+                .finish()
+        }
+    };
+
+    let user = identity.clone().unwrap();
+
+    let mut log = user.log;
+    log.reverse();
+
+    LogTemplate {
+        title: "log",
+        identity,
+        log: log.as_slice(),
     }
     .to_response()
 }
