@@ -138,6 +138,14 @@ async fn index(state: web::Data<State>, identity: Option<Identity>) -> Result<im
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let mut args = std::env::args().skip(1);
+    let mut port: Option<u16> = None;
+    while let Some(arg) = args.next() {
+        if matches!(arg.as_str(), "-p" | "--port") {
+            port = args.next().map(|inner| inner.parse::<u16>().unwrap());
+        }
+    }
+
     let secret_key = Key::generate();
 
     let client = Client::with_uri_str("mongodb://localhost:27017")
@@ -225,7 +233,7 @@ async fn main() -> std::io::Result<()> {
                     ),
             )
     })
-    .bind(("127.0.0.1", 9090))?
+    .bind(("127.0.0.1", port.unwrap_or(8080)))?
     .run()
     .await
 }
