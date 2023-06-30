@@ -1,6 +1,7 @@
 use bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
+
+use crate::relative_time;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Comment {
@@ -26,9 +27,7 @@ pub struct Issue {
 
 impl Issue {
     pub fn created_at(&self) -> String {
-        OffsetDateTime::from_unix_timestamp(self.created_at)
-            .unwrap()
-            .to_string()
+        relative_time::to_string(self.created_at)
     }
 }
 

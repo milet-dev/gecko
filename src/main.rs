@@ -4,6 +4,7 @@ mod issues;
 mod model;
 mod repository;
 mod user;
+mod relative_time;
 
 use crate::model::{Repository, User};
 use actix_files::Files;

@@ -8,7 +8,7 @@ use time::OffsetDateTime;
 
 use crate::{
     model::{Issue, Repository, User},
-    State,
+    relative_time, State,
 };
 
 #[derive(Template)]
@@ -102,9 +102,7 @@ pub async fn view(
         let body = markdown::to_html_with_options(&comment.body, &markdown::Options::gfm())
             .unwrap()
             .to_string();
-        let created_at = OffsetDateTime::from_unix_timestamp(comment.created_at.unwrap_or(0))
-            .unwrap()
-            .to_string();
+        let created_at = relative_time::to_string(comment.created_at.unwrap_or(0));
         comments.push(Comment {
             index: comment.index,
             username: user.username,
