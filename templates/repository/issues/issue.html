@@ -70,13 +70,17 @@
             (<span class="open">open</span>)
             {% else %}
             (<span class="closed">closed</span>)
-            {%endif %}
+            {% endif %}
         </div>
 
         <div style="margin-top: 10px;">
             <span>
-                <a href="/@{{ user.username }}" style="font-weight: 700;">@{{ user.username }}</a> <span
-                    style="color: rgb(139, 144, 147);">opened this issue {{ issue.created_at() }}</span>
+                {% if user.username.is_empty() %}
+                <span style="font-weight: 700;">undefined</span>
+                {% else %}
+                <a href="/@{{ user.username }}" style="font-weight: 700;">@{{ user.username }}</a>
+                {% endif %}
+                <span style="color: rgb(139, 144, 147);">opened this issue {{ issue.created_at() }}</span>
             </span>
         </div>
 
@@ -93,8 +97,12 @@
 
         <div style="margin-top: 20px;">
             <span>
-                <a href="/@{{ comment.username }}" style="font-weight: 700;">@{{ comment.username }}</a> <span
-                    style="color: rgb(139, 144, 147);">commented {{ comment.created_at }}</span>
+                {% if comment.username.is_empty() %}
+                <span style="font-weight: 700;">undefined</span>
+                {% else %}
+                <a href="/@{{ comment.username }}" style="font-weight: 700;">@{{ comment.username }}</a>
+                {% endif %}
+                <span style="color: rgb(139, 144, 147);">commented {{ comment.created_at }}</span>
             </span>
             <span style="color: rgb(139, 144, 147) ; float: right; user-select: none;">
                 <a href="#comment-{{ index }}" style="color: rgb(139, 144, 147);">#{{ index }}</a>

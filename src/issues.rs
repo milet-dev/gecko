@@ -8,7 +8,6 @@ use time::OffsetDateTime;
 
 use crate::{
     model::{Issue, Repository, User},
-    user::unix_timestamp,
     State,
 };
 

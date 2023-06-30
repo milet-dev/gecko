@@ -334,7 +334,14 @@ pub async fn tree_(
             repo.find_commit(Oid::from_str(&branch).unwrap()).unwrap()
         }
     };
-    let tree_entry = commit.tree().unwrap().get_path(Path::new(&tail)).unwrap();
+    let Ok(tree_entry) = commit.tree().unwrap().get_path(Path::new(&tail)) else {
+        let file = {
+            let rest = tail.split('/');
+            rest.last().unwrap()
+        };
+        let body = format!("the path '{file}' does not exist in the given tree");
+        return Ok(HttpResponse::NotFound().body(body));
+    };
     let object = tree_entry.to_object(&repo).unwrap();
 
     if let Some(blob) = object.as_blob() {
