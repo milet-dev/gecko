@@ -58,11 +58,16 @@
     </div>
 
     <div style="margin-top: 30px; max-width: 900px; font-size: 0.90rem;">
+        {% match identity %}
+        {% when Some with (_) %}
         <div style="min-height: 20px;">
             <div style="font-size: 0.90rem; font-weight: 400; margin-top: 10px; float: right;">
                 <a href="/@{{ username }}/{{ name }}/issues/new">new issue</a>
             </div>
         </div>
+        {% when None %}
+        {% endmatch %}
+
 
         <div style="font-size: 1.5rem; width: inherit;">
             <span>{{ issue.title }}</span> <span style="color: rgb(139, 144, 147);">#{{ issue.index }}</span>
