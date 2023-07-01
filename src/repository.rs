@@ -426,6 +426,11 @@ pub async fn tree_(
     let message = commit.message().unwrap().to_string();
     let author_name = commit.author().name().unwrap().to_string();
     let author_email = commit.author().email().unwrap().to_string();
+    let relative_time = time_utils::to_relative_time(commit.time().seconds());
+    let datetime = time_utils::to_datetime(
+        OffsetDateTime::from_unix_timestamp(commit.time().seconds()).unwrap(),
+        Some(commit.time().offset_minutes()),
+    );
     let commit_ = Commit {
         id: commit.id().to_string(),
         message,
@@ -433,8 +438,8 @@ pub async fn tree_(
             name: author_name,
             email: author_email,
         },
-        relative_time: String::new(),
-        datetime: String::new(),
+        relative_time,
+        datetime,
     };
     let mut readme: Option<(String, String)> = None;
     let mut entries = vec![];
@@ -758,6 +763,11 @@ fn push_log(commit: &git2::Commit, log: &mut Vec<Commit>, limit: Option<usize>) 
             return;
         }
     }
+    let relative_time = time_utils::to_relative_time(commit.time().seconds());
+    let datetime = time_utils::to_datetime(
+        OffsetDateTime::from_unix_timestamp(commit.time().seconds()).unwrap(),
+        Some(commit.time().offset_minutes()),
+    );
     log.push(Commit {
         id: commit.id().to_string(),
         message: commit.summary().unwrap().to_string(),
@@ -765,8 +775,8 @@ fn push_log(commit: &git2::Commit, log: &mut Vec<Commit>, limit: Option<usize>) 
             name: commit.author().name().unwrap().to_owned(),
             email: commit.author().email().unwrap().to_owned(),
         },
-        relative_time: String::new(),
-        datetime: String::new(),
+        relative_time,
+        datetime,
     });
     let Ok(parent) = commit.parent(0) else {
         return;
