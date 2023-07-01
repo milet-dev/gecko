@@ -107,6 +107,11 @@ pub async fn index(
     let message = commit.message().unwrap().to_string();
     let author_name = commit.author().name().unwrap().to_string();
     let author_email = commit.author().email().unwrap().to_string();
+    let relative_time = time_utils::to_relative_time(commit.time().seconds());
+    let datetime = time_utils::to_datetime(
+        OffsetDateTime::from_unix_timestamp(commit.time().seconds()).unwrap(),
+        Some(commit.time().offset_minutes()),
+    );
     let commit_ = Commit {
         id: commit.id().to_string(),
         message,
@@ -114,8 +119,8 @@ pub async fn index(
             name: author_name,
             email: author_email,
         },
-        relative_time: String::new(),
-        datetime: String::new(),
+        relative_time,
+        datetime,
     };
     let commit_tree = commit.tree().unwrap();
 

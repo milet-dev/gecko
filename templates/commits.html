@@ -18,7 +18,8 @@
                 <p>{{ commit.message }} (<a style="color: #70c5bf;"
                         href="/@{{ username }}/{{ name }}/commit/{{ commit.id }}">{{ commit.id[0..8] }}</a>) <a
                         style="color: #70c5bf;" href="/@{{ username }}/{{ name }}/tree/{{ commit.id }}">tree</a></p>
-                <p>{{ commit.author.name }} - {{ commit.author.email }}</p>
+                <p>{{ commit.author.name }} - {{ commit.author.email }} - <span title="{{ commit.datetime }}"
+                        style="color: rgb(139, 144, 147);">{{ commit.relative_time }}</span></p>
             </li>
             {% endfor %}
         </ul>
