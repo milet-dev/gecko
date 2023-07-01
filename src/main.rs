@@ -3,8 +3,8 @@ mod diff;
 mod issues;
 mod model;
 mod repository;
+mod time_utils;
 mod user;
-mod relative_time;
 
 use crate::model::{Repository, User};
 use actix_files::Files;

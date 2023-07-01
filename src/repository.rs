@@ -1,7 +1,7 @@
 use crate::{
     diff::Diff,
     model::{self, User},
-    State,
+    time_utils, State,
 };
 use actix_identity::Identity;
 use actix_web::{get, web, HttpResponse, Responder, Result};
@@ -41,6 +41,8 @@ struct Commit {
     id: String,
     message: String,
     author: Author,
+    relative_time: String,
+    datetime: String,
 }
 
 #[derive(Debug, Clone)]
@@ -112,6 +114,8 @@ pub async fn index(
             name: author_name,
             email: author_email,
         },
+        relative_time: String::new(),
+        datetime: String::new(),
     };
     let commit_tree = commit.tree().unwrap();
 
@@ -238,6 +242,8 @@ pub async fn tree(
             name: author_name,
             email: author_email,
         },
+        relative_time: String::new(),
+        datetime: String::new(),
     };
     let mut readme: Option<(String, String)> = None;
     let mut entries = vec![];
@@ -417,6 +423,8 @@ pub async fn tree_(
             name: author_name,
             email: author_email,
         },
+        relative_time: String::new(),
+        datetime: String::new(),
     };
     let mut readme: Option<(String, String)> = None;
     let mut entries = vec![];
@@ -622,6 +630,11 @@ pub async fn commits(
                     let oid = commit.unwrap();
                     let commit = repo.find_commit(oid).unwrap();
                     let author = commit.author();
+                    let relative_time = time_utils::to_relative_time(commit.time().seconds());
+                    let datetime = time_utils::to_datetime(
+                        OffsetDateTime::from_unix_timestamp(commit.time().seconds()).unwrap(),
+                        Some(commit.time().offset_minutes()),
+                    );
                     commits.push(Commit {
                         id: commit.id().to_string(),
                         message: commit.message().unwrap().to_string(),
@@ -629,6 +642,8 @@ pub async fn commits(
                             name: author.name().unwrap_or_default().to_owned(),
                             email: author.email().unwrap_or_default().to_owned(),
                         },
+                        relative_time,
+                        datetime,
                     });
                 }
             }
@@ -661,7 +676,8 @@ pub struct DiffCommit {
     parent_ids: Vec<String>,
     author: Author,
     summary: String,
-    time: String,
+    relative_time: String,
+    datetime: String,
 }
 
 #[derive(Template)]
@@ -706,6 +722,10 @@ pub async fn diff(path: web::Path<(String, String, String)>) -> Result<impl Resp
             .unwrap_or_default(),
     };
 
+    let unix_timestamp = time.unix_timestamp();
+    let relative_time = time_utils::to_relative_time(unix_timestamp);
+    let datetime = time_utils::to_datetime(time, None);
+
     Ok(CommitTemplate {
         username: &username,
         name: &name,
@@ -714,7 +734,8 @@ pub async fn diff(path: web::Path<(String, String, String)>) -> Result<impl Resp
             parent_ids,
             author,
             summary: summary.to_string(),
-            time: time.to_string(),
+            relative_time,
+            datetime,
         },
         diff: &diff,
     }
@@ -734,6 +755,8 @@ fn push_log(commit: &git2::Commit, log: &mut Vec<Commit>, limit: Option<usize>) 
             name: commit.author().name().unwrap().to_owned(),
             email: commit.author().email().unwrap().to_owned(),
         },
+        relative_time: String::new(),
+        datetime: String::new(),
     });
     let Ok(parent) = commit.parent(0) else {
         return;

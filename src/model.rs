@@ -1,8 +1,6 @@
 use bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
-use crate::relative_time;
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Comment {
     pub _id: ObjectId,
@@ -27,7 +25,7 @@ pub struct Issue {
 
 impl Issue {
     pub fn created_at(&self) -> String {
-        relative_time::to_string(self.created_at)
+        crate::time_utils::to_relative_time(self.created_at)
     }
 }
 
