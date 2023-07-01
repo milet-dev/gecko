@@ -41,5 +41,5 @@ pub fn to_datetime(time: OffsetDateTime, offset: Option<i32>) -> String {
             None => time,
         }
     };
-    t.format(&format).unwrap().to_string()
+    t.format(&format).unwrap()
 }

@@ -106,10 +106,7 @@ pub async fn view(
         let created_at = comment.created_at.unwrap_or(0);
         let relative_time = time_utils::to_relative_time(created_at);
         let datetime = time_utils::to_datetime(
-            {
-                let offset_dt = OffsetDateTime::from_unix_timestamp(created_at).unwrap();
-                offset_dt
-            },
+            OffsetDateTime::from_unix_timestamp(created_at).unwrap(),
             None,
         );
         comments.push(Comment {

@@ -40,7 +40,7 @@ impl Database {
     pub async fn find_user_from_id(&self, id: &str) -> Option<User> {
         let collection = self.inner.collection::<User>("users");
         let result = collection
-            .find_one(bson::doc! { "_id": ObjectId::from_str(&id).unwrap() }, None)
+            .find_one(bson::doc! { "_id": ObjectId::from_str(id).unwrap() }, None)
             .await;
         result.unwrap_or(None)
     }
