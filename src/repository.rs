@@ -107,10 +107,12 @@ pub async fn index(
     let message = commit.message().unwrap().to_string();
     let author_name = commit.author().name().unwrap().to_string();
     let author_email = commit.author().email().unwrap().to_string();
-    let relative_time = time_utils::to_relative_time(commit.time().seconds());
+    let offset = commit.time().offset_minutes();
+    let seconds = commit.time().seconds();
+    let relative_time = time_utils::to_relative_time(seconds);
     let datetime = time_utils::to_datetime(
-        OffsetDateTime::from_unix_timestamp(commit.time().seconds()).unwrap(),
-        Some(commit.time().offset_minutes()),
+        OffsetDateTime::from_unix_timestamp(seconds).unwrap(),
+        Some(offset),
     );
     let commit_ = Commit {
         id: commit.id().to_string(),
@@ -240,10 +242,12 @@ pub async fn tree(
     let message = commit.summary().unwrap().to_string();
     let author_name = commit.author().name().unwrap().to_string();
     let author_email = commit.author().email().unwrap().to_string();
-    let relative_time = time_utils::to_relative_time(commit.time().seconds());
+    let offset = commit.time().offset_minutes();
+    let seconds = commit.time().seconds();
+    let relative_time = time_utils::to_relative_time(seconds);
     let datetime = time_utils::to_datetime(
-        OffsetDateTime::from_unix_timestamp(commit.time().seconds()).unwrap(),
-        Some(commit.time().offset_minutes()),
+        OffsetDateTime::from_unix_timestamp(seconds).unwrap(),
+        Some(offset),
     );
     let commit_ = Commit {
         id: commit.id().to_string(),
@@ -426,10 +430,12 @@ pub async fn tree_(
     let message = commit.message().unwrap().to_string();
     let author_name = commit.author().name().unwrap().to_string();
     let author_email = commit.author().email().unwrap().to_string();
-    let relative_time = time_utils::to_relative_time(commit.time().seconds());
+    let offset = commit.time().offset_minutes();
+    let seconds = commit.time().seconds();
+    let relative_time = time_utils::to_relative_time(seconds);
     let datetime = time_utils::to_datetime(
-        OffsetDateTime::from_unix_timestamp(commit.time().seconds()).unwrap(),
-        Some(commit.time().offset_minutes()),
+        OffsetDateTime::from_unix_timestamp(seconds).unwrap(),
+        Some(offset),
     );
     let commit_ = Commit {
         id: commit.id().to_string(),
@@ -645,10 +651,12 @@ pub async fn commits(
                     let oid = commit.unwrap();
                     let commit = repo.find_commit(oid).unwrap();
                     let author = commit.author();
-                    let relative_time = time_utils::to_relative_time(commit.time().seconds());
+                    let offset = commit.time().offset_minutes();
+                    let seconds = commit.time().seconds();
+                    let relative_time = time_utils::to_relative_time(seconds);
                     let datetime = time_utils::to_datetime(
-                        OffsetDateTime::from_unix_timestamp(commit.time().seconds()).unwrap(),
-                        Some(commit.time().offset_minutes()),
+                        OffsetDateTime::from_unix_timestamp(seconds).unwrap(),
+                        Some(offset),
                     );
                     commits.push(Commit {
                         id: commit.id().to_string(),
@@ -763,10 +771,11 @@ fn push_log(commit: &git2::Commit, log: &mut Vec<Commit>, limit: Option<usize>) 
             return;
         }
     }
+    let offset = commit.time().offset_minutes();
     let relative_time = time_utils::to_relative_time(commit.time().seconds());
     let datetime = time_utils::to_datetime(
         OffsetDateTime::from_unix_timestamp(commit.time().seconds()).unwrap(),
-        Some(commit.time().offset_minutes()),
+        Some(offset),
     );
     log.push(Commit {
         id: commit.id().to_string(),
