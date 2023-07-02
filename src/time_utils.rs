@@ -35,7 +35,7 @@ pub fn to_datetime(time: OffsetDateTime, offset: Option<i32>) -> String {
     let t = {
         match offset {
             Some(m) => {
-                let utc_offset = UtcOffset::from_whole_seconds(m / 60).unwrap();
+                let utc_offset = UtcOffset::from_whole_seconds(m * 60).unwrap();
                 time.to_offset(utc_offset)
             }
             None => time,
