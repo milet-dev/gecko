@@ -114,6 +114,7 @@ pub async fn index(
         OffsetDateTime::from_unix_timestamp(seconds).unwrap(),
         Some(offset),
     );
+
     let commit_ = Commit {
         id: commit.id().to_string(),
         message,
@@ -725,11 +726,6 @@ pub async fn diff(path: web::Path<(String, String, String)>) -> Result<impl Resp
         .map(|parent_id| parent_id.to_string())
         .collect();
 
-    let offset = UtcOffset::from_whole_seconds(time.offset_minutes() * 60).unwrap();
-    let time = OffsetDateTime::from_unix_timestamp(time.seconds())
-        .unwrap()
-        .to_offset(offset);
-
     let diff = Diff::new(&repo, &id);
 
     let author = Author {
@@ -745,9 +741,11 @@ pub async fn diff(path: web::Path<(String, String, String)>) -> Result<impl Resp
             .unwrap_or_default(),
     };
 
-    let unix_timestamp = time.unix_timestamp();
-    let relative_time = time_utils::to_relative_time(unix_timestamp);
-    let datetime = time_utils::to_datetime(time, None);
+    let seconds = time.seconds();
+    let offset = time.offset_minutes();
+    let offset_date_time = OffsetDateTime::from_unix_timestamp(seconds).unwrap();
+    let relative_time = time_utils::to_relative_time(seconds);
+    let datetime = time_utils::to_datetime(offset_date_time, Some(offset));
 
     Ok(CommitTemplate {
         username: &username,
