@@ -43,3 +43,17 @@ pub fn to_datetime(time: OffsetDateTime, offset: Option<i32>) -> String {
     };
     t.format(&format).unwrap()
 }
+
+pub fn to_datetime_format(time: OffsetDateTime, offset: Option<i32>, format: &str) -> String {
+    let format = format_description::parse(format).unwrap();
+    let t = {
+        match offset {
+            Some(m) => {
+                let utc_offset = UtcOffset::from_whole_seconds(m * 60).unwrap();
+                time.to_offset(utc_offset)
+            }
+            None => time,
+        }
+    };
+    t.format(&format).unwrap()
+}
