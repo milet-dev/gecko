@@ -152,7 +152,7 @@
             name }}</a>
     </div>
     <div style="margin: 10px;">
-        <span>{{ commit.summary }} {{ commit.time }}</span>
+        <span>{{ commit.summary }} <span title="{{ commit.datetime }}">{{ commit.relative_time }}</span></span>
     </div>
     <div style="margin: 10px;">
         <span>{{ commit.author.name }} - {{ commit.author.email }}</span>

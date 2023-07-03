@@ -3,6 +3,7 @@ mod diff;
 mod issues;
 mod model;
 mod repository;
+mod time_utils;
 mod user;
 
 use crate::model::{Repository, User};

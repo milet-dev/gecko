@@ -85,7 +85,8 @@
                 {% else %}
                 <a href="/@{{ user.username }}" style="font-weight: 700;">@{{ user.username }}</a>
                 {% endif %}
-                <span style="color: rgb(139, 144, 147);">opened this issue {{ issue.created_at() }}</span>
+                <span style="color: rgb(139, 144, 147);" title="{{ issue.created_at_dt() }}">opened this issue {{
+                    issue.created_at() }}</span>
             </span>
         </div>
 
@@ -107,7 +108,8 @@
                 {% else %}
                 <a href="/@{{ comment.username }}" style="font-weight: 700;">@{{ comment.username }}</a>
                 {% endif %}
-                <span style="color: rgb(139, 144, 147);">commented {{ comment.created_at }}</span>
+                <span style="color: rgb(139, 144, 147);" title="{{ comment.datetime }}">commented {{
+                    comment.relative_time }}</span>
             </span>
             <span style="color: rgb(139, 144, 147) ; float: right; user-select: none;">
                 <a href="#comment-{{ index }}" style="color: rgb(139, 144, 147);">#{{ index }}</a>

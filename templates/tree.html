@@ -23,7 +23,8 @@
 
     <div style="max-width: 800px;">
         <p>{{ commit.message }} (<a href="/@{{ username }}/{{ name }}/commit/{{ commit.id }}" style="color: #70c5bf;">{{
-                commit.id[0..8] }}</a>)</p>
+                commit.id[0..8] }}</a>) - <span title="{{ commit.datetime }}" style="color: rgb(139, 144, 147);">{{
+                commit.relative_time }}</span></p>
         <p>{{ commit.author.name }} - {{ commit.author.email }}</p>
     </div>
 

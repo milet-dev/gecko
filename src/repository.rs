@@ -1,7 +1,7 @@
 use crate::{
     diff::Diff,
     model::{self, User},
-    State,
+    time_utils, State,
 };
 use actix_identity::Identity;
 use actix_web::{get, web, HttpResponse, Responder, Result};
@@ -41,6 +41,8 @@ struct Commit {
     id: String,
     message: String,
     author: Author,
+    relative_time: String,
+    datetime: String,
 }
 
 #[derive(Debug, Clone)]
@@ -105,6 +107,14 @@ pub async fn index(
     let message = commit.message().unwrap().to_string();
     let author_name = commit.author().name().unwrap().to_string();
     let author_email = commit.author().email().unwrap().to_string();
+    let offset = commit.time().offset_minutes();
+    let seconds = commit.time().seconds();
+    let relative_time = time_utils::to_relative_time(seconds);
+    let datetime = time_utils::to_datetime(
+        OffsetDateTime::from_unix_timestamp(seconds).unwrap(),
+        Some(offset),
+    );
+
     let commit_ = Commit {
         id: commit.id().to_string(),
         message,
@@ -112,6 +122,8 @@ pub async fn index(
             name: author_name,
             email: author_email,
         },
+        relative_time,
+        datetime,
     };
     let commit_tree = commit.tree().unwrap();
 
@@ -231,6 +243,13 @@ pub async fn tree(
     let message = commit.summary().unwrap().to_string();
     let author_name = commit.author().name().unwrap().to_string();
     let author_email = commit.author().email().unwrap().to_string();
+    let offset = commit.time().offset_minutes();
+    let seconds = commit.time().seconds();
+    let relative_time = time_utils::to_relative_time(seconds);
+    let datetime = time_utils::to_datetime(
+        OffsetDateTime::from_unix_timestamp(seconds).unwrap(),
+        Some(offset),
+    );
     let commit_ = Commit {
         id: commit.id().to_string(),
         message,
@@ -238,6 +257,8 @@ pub async fn tree(
             name: author_name,
             email: author_email,
         },
+        relative_time,
+        datetime,
     };
     let mut readme: Option<(String, String)> = None;
     let mut entries = vec![];
@@ -410,6 +431,13 @@ pub async fn tree_(
     let message = commit.message().unwrap().to_string();
     let author_name = commit.author().name().unwrap().to_string();
     let author_email = commit.author().email().unwrap().to_string();
+    let offset = commit.time().offset_minutes();
+    let seconds = commit.time().seconds();
+    let relative_time = time_utils::to_relative_time(seconds);
+    let datetime = time_utils::to_datetime(
+        OffsetDateTime::from_unix_timestamp(seconds).unwrap(),
+        Some(offset),
+    );
     let commit_ = Commit {
         id: commit.id().to_string(),
         message,
@@ -417,6 +445,8 @@ pub async fn tree_(
             name: author_name,
             email: author_email,
         },
+        relative_time,
+        datetime,
     };
     let mut readme: Option<(String, String)> = None;
     let mut entries = vec![];
@@ -622,6 +652,13 @@ pub async fn commits(
                     let oid = commit.unwrap();
                     let commit = repo.find_commit(oid).unwrap();
                     let author = commit.author();
+                    let offset = commit.time().offset_minutes();
+                    let seconds = commit.time().seconds();
+                    let relative_time = time_utils::to_relative_time(seconds);
+                    let datetime = time_utils::to_datetime(
+                        OffsetDateTime::from_unix_timestamp(seconds).unwrap(),
+                        Some(offset),
+                    );
                     commits.push(Commit {
                         id: commit.id().to_string(),
                         message: commit.message().unwrap().to_string(),
@@ -629,6 +666,8 @@ pub async fn commits(
                             name: author.name().unwrap_or_default().to_owned(),
                             email: author.email().unwrap_or_default().to_owned(),
                         },
+                        relative_time,
+                        datetime,
                     });
                 }
             }
@@ -661,7 +700,8 @@ pub struct DiffCommit {
     parent_ids: Vec<String>,
     author: Author,
     summary: String,
-    time: String,
+    relative_time: String,
+    datetime: String,
 }
 
 #[derive(Template)]
@@ -686,11 +726,6 @@ pub async fn diff(path: web::Path<(String, String, String)>) -> Result<impl Resp
         .map(|parent_id| parent_id.to_string())
         .collect();
 
-    let offset = UtcOffset::from_whole_seconds(time.offset_minutes() * 60).unwrap();
-    let time = OffsetDateTime::from_unix_timestamp(time.seconds())
-        .unwrap()
-        .to_offset(offset);
-
     let diff = Diff::new(&repo, &id);
 
     let author = Author {
@@ -706,6 +741,12 @@ pub async fn diff(path: web::Path<(String, String, String)>) -> Result<impl Resp
             .unwrap_or_default(),
     };
 
+    let seconds = time.seconds();
+    let offset = time.offset_minutes();
+    let offset_date_time = OffsetDateTime::from_unix_timestamp(seconds).unwrap();
+    let relative_time = time_utils::to_relative_time(seconds);
+    let datetime = time_utils::to_datetime(offset_date_time, Some(offset));
+
     Ok(CommitTemplate {
         username: &username,
         name: &name,
@@ -714,7 +755,8 @@ pub async fn diff(path: web::Path<(String, String, String)>) -> Result<impl Resp
             parent_ids,
             author,
             summary: summary.to_string(),
-            time: time.to_string(),
+            relative_time,
+            datetime,
         },
         diff: &diff,
     }
@@ -727,6 +769,12 @@ fn push_log(commit: &git2::Commit, log: &mut Vec<Commit>, limit: Option<usize>) 
             return;
         }
     }
+    let offset = commit.time().offset_minutes();
+    let relative_time = time_utils::to_relative_time(commit.time().seconds());
+    let datetime = time_utils::to_datetime(
+        OffsetDateTime::from_unix_timestamp(commit.time().seconds()).unwrap(),
+        Some(offset),
+    );
     log.push(Commit {
         id: commit.id().to_string(),
         message: commit.summary().unwrap().to_string(),
@@ -734,6 +782,8 @@ fn push_log(commit: &git2::Commit, log: &mut Vec<Commit>, limit: Option<usize>) 
             name: commit.author().name().unwrap().to_owned(),
             email: commit.author().email().unwrap().to_owned(),
         },
+        relative_time,
+        datetime,
     });
     let Ok(parent) = commit.parent(0) else {
         return;

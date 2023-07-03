@@ -8,7 +8,7 @@ use time::OffsetDateTime;
 
 use crate::{
     model::{Issue, Repository, User},
-    State,
+    time_utils, State,
 };
 
 #[derive(Template)]
@@ -66,7 +66,8 @@ struct Comment {
     index: i64,
     username: String,
     body: String,
-    created_at: String,
+    relative_time: String,
+    datetime: String,
 }
 
 pub async fn view(
@@ -102,14 +103,18 @@ pub async fn view(
         let body = markdown::to_html_with_options(&comment.body, &markdown::Options::gfm())
             .unwrap()
             .to_string();
-        let created_at = OffsetDateTime::from_unix_timestamp(comment.created_at.unwrap_or(0))
-            .unwrap()
-            .to_string();
+        let created_at = comment.created_at.unwrap_or(0);
+        let relative_time = time_utils::to_relative_time(created_at);
+        let datetime = time_utils::to_datetime(
+            OffsetDateTime::from_unix_timestamp(created_at).unwrap(),
+            None,
+        );
         comments.push(Comment {
             index: comment.index,
             username: user.username,
             body,
-            created_at,
+            relative_time,
+            datetime,
         })
     }
 
