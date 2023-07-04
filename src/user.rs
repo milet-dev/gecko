@@ -107,6 +107,10 @@ pub async fn login(
                     .insert_header(("Location", "/login"))
                     .finish();
             }
+            state
+                .database
+                .add_user_log(&user, Event::Login, Some(user.username.clone()))
+                .await;
             HttpResponse::SeeOther()
                 .insert_header(("Location", "/login"))
                 .finish()
@@ -116,8 +120,14 @@ pub async fn login(
 }
 
 #[get("/logout")]
-pub async fn logout(identity: Option<Identity>) -> impl Responder {
+pub async fn logout(identity: Option<Identity>, state: web::Data<State>) -> impl Responder {
     if let Some(identity) = identity {
+        let id = identity.id().unwrap();
+        let user = state.database.find_user_from_id(&id).await.unwrap();
+        state
+            .database
+            .add_user_log(&user, Event::Logout, Some(user.username.clone()))
+            .await;
         identity.logout();
     }
     web::Redirect::to("/").see_other()
@@ -445,9 +455,15 @@ pub async fn update_password(
         )
         .await;
     match result {
-        Ok(update_result) if update_result.modified_count != 0 => HttpResponse::SeeOther()
-            .insert_header(("Location", "/settings/password"))
-            .finish(),
+        Ok(update_result) if update_result.modified_count != 0 => {
+            state
+                .database
+                .add_user_log(&user, Event::UpdatePassword, None)
+                .await;
+            HttpResponse::SeeOther()
+                .insert_header(("Location", "/settings/password"))
+                .finish()
+        }
         _ => HttpResponse::SeeOther()
             .insert_header(("Location", "/login"))
             .finish(),

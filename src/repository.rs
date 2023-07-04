@@ -1,6 +1,6 @@
 use crate::{
     diff::Diff,
-    model::{self, User},
+    model::{self, Event, User},
     time_utils, State,
 };
 use actix_identity::Identity;
@@ -9,7 +9,7 @@ use askama::Template;
 use askama_actix::TemplateToResponse;
 use git2::Oid;
 use std::path::Path;
-use time::{OffsetDateTime, UtcOffset};
+use time::OffsetDateTime;
 
 const MAX_COMMIT_LEN: usize = 20;
 
@@ -809,7 +809,14 @@ pub async fn delete(
 
     let result = state.database.delete_repository(&identity, &name).await;
     match result {
-        Ok(_) => "Ok",
+        Ok(_) => {
+            let user = identity.unwrap();
+            state
+                .database
+                .add_user_log(&user, Event::RepositoryDelete, Some(name))
+                .await;
+            "Ok"
+        }
         Err(e) => match e {
             crate::database::Error::Unauthorized => "Unauthorized",
             crate::database::Error::NotFound => "Not Found",

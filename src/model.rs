@@ -30,6 +30,7 @@ impl Issue {
     pub fn created_at(&self) -> String {
         crate::time_utils::to_relative_time(self.created_at)
     }
+
     pub fn created_at_dt(&self) -> String {
         time_utils::to_datetime(
             OffsetDateTime::from_unix_timestamp(self.created_at).unwrap(),
@@ -64,13 +65,21 @@ pub struct User {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Event {
+    Login,
+    Logout,
+    UpdatePassword,
     RepositoryCreate,
+    RepositoryDelete,
 }
 
 impl Event {
     pub fn to_string(&self) -> String {
         match self {
+            Event::Login => String::from("user.login"),
+            Event::Logout => String::from("user.logout"),
+            Event::UpdatePassword => String::from("user.update_password"),
             Event::RepositoryCreate => String::from("repository.create"),
+            Event::RepositoryDelete => String::from("repository.delete"),
         }
     }
 }
@@ -80,4 +89,17 @@ pub struct Log {
     pub event: String,
     pub description: String,
     pub created_at: i64,
+}
+
+impl Log {
+    pub fn created_at(&self) -> String {
+        crate::time_utils::to_relative_time(self.created_at)
+    }
+
+    pub fn created_at_dt(&self) -> String {
+        time_utils::to_datetime(
+            OffsetDateTime::from_unix_timestamp(self.created_at).unwrap(),
+            None,
+        )
+    }
 }

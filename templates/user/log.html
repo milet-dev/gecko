@@ -2,7 +2,7 @@
 
 <div style="position: relative; margin: 30px;">
     <h4>Log:</h4>
-    <ul>
+    <ul style="display: flex; flex-direction: column; row-gap: 1ch;">
         {% for entry in log %}
         <li>
             <div>
@@ -10,7 +10,9 @@
                     <a href="">{{ entry.event }}</a>
                 </div>
                 <div>{{ entry.description }}</div>
-                <div>{{ entry.created_at }}</div>
+                <div>
+                    <span style="color: rgb(139, 144, 147);" title="{{ entry.created_at_dt() }}">{{ entry.created_at() }}</span>
+                </div>
             </div>
         </li>
         {% endfor %}
