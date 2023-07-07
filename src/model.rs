@@ -73,13 +73,13 @@ pub enum Event {
 }
 
 impl Event {
-    pub fn to_string(&self) -> String {
+    pub fn to_str(&self) -> &str {
         match self {
-            Event::Login => String::from("user.login"),
-            Event::Logout => String::from("user.logout"),
-            Event::UpdatePassword => String::from("user.update_password"),
-            Event::RepositoryCreate => String::from("repository.create"),
-            Event::RepositoryDelete => String::from("repository.delete"),
+            Event::Login => "user.login",
+            Event::Logout => "user.logout",
+            Event::UpdatePassword => "user.update_password",
+            Event::RepositoryCreate => "repository.create",
+            Event::RepositoryDelete => "repository.delete",
         }
     }
 }

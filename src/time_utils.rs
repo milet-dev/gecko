@@ -22,7 +22,7 @@ pub fn to_relative_time(input: i64) -> String {
             return "1 day ago".to_owned();
         }
         let weeks = days / 7;
-        if weeks >= 1 && weeks <= 3 {
+        if (1..=3).contains(&weeks) {
             if weeks == 1 {
                 return "1 week ago".to_owned();
             }
@@ -37,13 +37,6 @@ pub fn to_relative_time(input: i64) -> String {
     if months <= 11 {
         return format!("{months} months ago");
     }
-
-    /* let years = months / 12;
-    if years == 1 {
-        return "1 year ago".to_owned();
-    } else {
-        return format!("{years} years ago");
-    } */
 
     let time = OffsetDateTime::from_unix_timestamp(input).unwrap();
     to_datetime_format(time, None, "[month repr:short] [day], [year]")

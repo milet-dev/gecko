@@ -140,7 +140,7 @@ impl Database {
         let now = time::OffsetDateTime::now_utc();
         let unix_timestamp = now.unix_timestamp();
         let log = Log {
-            event: event.to_string(),
+            event: event.to_str().to_owned(),
             description: description.unwrap_or("undefined".to_owned()),
             created_at: unix_timestamp,
         };
